@@ -11,16 +11,6 @@ typedef struct DynArr {
     size_t size_of_elem; // size of individual elements
 } DynArr;
 
-// DynArr DynArr_NewS() {
-//     DynArr arr = {
-//         .arr_ptr = NULL,
-//         .capacity = 0,
-//         .size = 0,
-//     };
-
-//     return arr;
-// }
-
 // Allocates enough space to meet the desired capacity
 // the acutal space allocated may be more than specified
 DynArr DynArr_WithCapacityS(size_t capacity, size_t size_of_elems) {
@@ -41,7 +31,7 @@ DynArr DynArr_WithCapacityS(size_t capacity, size_t size_of_elems) {
 }
 
 void *DynArr_Get(DynArr this, size_t pos) {
-    if ((pos * (this.size_of_elem)) > ((this.size_of_elem) * (this.size))) {
+    if ((pos) >= (this.size)) {
         return NULL;
     }
 
@@ -69,7 +59,7 @@ void DynArr_Push(DynArr *this, void *elem) {
 
 #define DynArr_ForEach(dyn_arr, type, elem, action) \
 for (size_t DYNARR_RESERVED_INDEX = 0; DYNARR_RESERVED_INDEX < (dyn_arr).size; ++DYNARR_RESERVED_INDEX) { \
-    type *(elem) = (dyn_arr).arr_ptr + (((dyn_arr).size_of_elem) * DYNARR_RESERVED_INDEX); \
+    type *(elem) = (dyn_arr).arr_ptr + (((dyn_arr).size_of_elem) * ix); \
     action \
 }
 
