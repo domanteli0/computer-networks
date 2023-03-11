@@ -1,0 +1,16 @@
+run: build
+    ./main 127.0.0.1 6060
+
+build:
+    clang main.c \
+    -I /opt/homebrew/include \
+    -L /opt/homebrew/lib \
+    -lSDL2 \
+    -o main \
+    -W \
+    -Wall \
+    -Wextra \
+    -g
+
+clean:
+    main
