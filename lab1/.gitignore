@@ -1,5 +1,4 @@
 *.dSYM
-server
 .vscode
-client
 server
+client
