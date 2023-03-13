@@ -17,7 +17,9 @@
 
 // TODO: use header files
 #include "types.c"
-#include "dynarr.c"
+
+#include "dynarr.h"
+#include "dict.h"
 
 #define BUFFLEN 1024
 
@@ -79,7 +81,7 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
-    DynArr points = DynArr_WithCapacityS(1024, sizeof(Float2));
+    DynArr points = DynArr_WithCapacity(1024, sizeof(Float2));
 
     while (1) {
         SDL_PollEvent(&event);
@@ -90,11 +92,14 @@ int main(int argc, char *argv[]) {
         }
 
         SDL_SetRenderDrawColor(renderer, 
-                               0x20, 
-                               0x20, 
-                               0x20, 
-                               0x20);
+                            0x20, 
+                            0x20, 
+                            0x20, 
+                            0x20);
         SDL_RenderClear(renderer);
+
+        // TODO: Generalize this:
+        // dict: key - (UiMode, event), value - fn(...) -> struct Item
 
         // draw
         if (event.type == SDL_MOUSEMOTION) {
@@ -120,7 +125,7 @@ int main(int argc, char *argv[]) {
     SDL_DestroyWindow(window);
     SDL_Quit();
     DynArr_Free(points);
-    
+
     printf("Enter the message: ");
     fgets(buffer, BUFFLEN, stdin);
 
@@ -138,7 +143,6 @@ int main(int argc, char *argv[]) {
     return 0;
 }
 
-#define CONNECT_SUCCESS 0
 #define CONNECT_INVALID_PORT -1
 #define CONNECT_SOCKET_INIT_ERR -2
 #define CONNECT_INVALID_IP_ADDR -3
@@ -150,7 +154,7 @@ int main(int argc, char *argv[]) {
 // -3  | Invalid IP address
 // -4  | Failure to connect
 int connect_to(char *ipv4_addr, char *port_str) {
-	struct sockaddr_in servaddr; // Serverio address struct
+struct sockaddr_in servaddr; // Serverio address struct
 
     // port validation
     int port = atoi(port_str);
