@@ -21,6 +21,7 @@ DynArr DynArr_WithCapacity(size_t capacity, size_t size_of_elems) {
     return arr;
 }
 
+// Gets the element at pos, return NULL if pos is out of range 
 void *DynArr_Get(DynArr this, size_t pos) {
     if ((pos) >= (this.size)) {
         return NULL;
@@ -58,7 +59,9 @@ void DynArr_Free(DynArr this) {
     free(this.arr_ptr);
 }
 
-void *DynArr_Find(DynArr this, bool(*pred)(void *)) {
+// return the address of the first element if the predicate returns true
+// else NULL
+void *DynArr_Find(DynArr this, bool(pred)(void *)) {
     for (size_t ix = 0; ix < this.size; ++ix) {
         void *current = this.arr_ptr + (ix * this.size_of_elem); 
         if (pred(current)) {

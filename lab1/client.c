@@ -14,14 +14,14 @@
 #include <arpa/inet.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <sys/select.h>
 
 // TODO: use header files
 #include "types.c"
 
 #include "dynarr.h"
 #include "dict.h"
-
-#define BUFFLEN 1024
+#include "utils.h"
 
 int connect_to(char *ipv4_addr, char *port);
 
@@ -39,16 +39,23 @@ char *SDL_MouseMotionEventToString(SDL_MouseMotionEvent e) {
     return str;
 }
 
-// TODO: Translate mouse coordinates to Canvas coordinates
-int main(int argc, char *argv[]) {
-    char buffer[BUFFLEN];
+typedef struct ClientState {
+    uint64_t identifier;
+    DynArr points;
+} ClientState;
 
+void do_nothing() {}
+
+// TODO: Translate mouse coordinates to Canvas coordinates
+// TODO: waiting_to_send queue for failed sends
+int main(int argc, char *argv[]) {
     if (argc != 3){
         fprintf(stderr, "USAGE: <ip> <port>\n");
         exit(EXIT_FAILURE);
     }
 
     int server_handle = connect_to(argv[1], argv[2]);
+
 
     switch (server_handle) {
         case -1:
@@ -64,6 +71,24 @@ int main(int argc, char *argv[]) {
             fprintf(stderr,"ERROR #4: error in connect().\n");
             exit(EXIT_FAILURE);
     }
+
+    ClientState client_state = {
+        .identifier = 0,
+        .points = DynArr_WithCapacity(1024, sizeof(Float2)),
+    };
+
+    // recv(server_handle, &client_state.identifier, sizeof(uint32_t), 0);
+    // printf("ident: %u\n", client_state.identifier);
+
+    // recv(server_handle, &client_state.identifier, sizeof(uint32_t), 0);
+    // printf("ident: %u\n", client_state.identifier);
+
+    // printf("nothing looks like: %i\n", recv(
+    //     server_handle,
+    //     &client_state,
+    //     sizeof(__uint128_t),
+    //     0
+    // ));
 
     SDL_Window *window;
     SDL_Renderer *renderer;
@@ -83,6 +108,12 @@ int main(int argc, char *argv[]) {
 
     DynArr points = DynArr_WithCapacity(1024, sizeof(Float2));
 
+    // TODO: retrieve state
+
+    fd_set read_fds;
+    FD_ZERO(&read_fds);
+    FD_SET(server_handle, &read_fds);
+
     while (1) {
         SDL_PollEvent(&event);
 
@@ -91,12 +122,57 @@ int main(int argc, char *argv[]) {
             break;
         }
 
+        // TODO: Check if server is alive
+
+        // handle receiving data 
+        {
+            // this set consists only of one handle, that is the server
+            fd_set read_set;
+            FD_ZERO(&read_set);
+            FD_SET(server_handle, &read_set);
+            struct timeval timeout = timeval_FromMicro(10000);
+
+            switch (select(server_handle, &read_set, NULL, NULL, &timeout)) {
+                case -1:
+                    fprintf(stderr, "select error");
+                    break;
+                case 0:
+                    // just a timeout, just carry on, we don't care
+                    break;
+                default:
+                    do_nothing(); // literally, does nothing, but doesn't compile if I remove it
+
+                    printf("About to receive some bytes\n");
+
+                    int foo = 0;
+                    // yay, let's read some data
+                    uint16_t type_id = 0;
+
+                    int recv_bytes = recv(
+                        server_handle,
+                        &type_id,
+                        sizeof(uint16_t),
+                        0);
+                        
+                    printf("Bytes received: %i\n", recv_bytes);
+                    assert(recv_bytes == sizeof(Header));
+
+                    // I was planning to more types than dots
+                    // so just imagine type_id is checked and appropiate type is sellected
+                    Float2 dot;
+                    recv(server_handle, &dot, sizeof(Float2), 0);
+            }
+
+        }
+
         SDL_SetRenderDrawColor(renderer, 
                             0x20, 
                             0x20, 
                             0x20, 
                             0x20);
         SDL_RenderClear(renderer);
+
+        // TODO: if poll, retrive new data
 
         // TODO: Generalize this:
         // dict: key - (UiMode, event), value - fn(...) -> struct Item
@@ -109,8 +185,12 @@ int main(int argc, char *argv[]) {
             // event.motion.xrel
 
             if (mouse_left_down) {
+                printf("Drawing dots\n");
+
                 Float2 temp = Float2_New(event.motion.x, event.motion.y);
-                // TODO: send point data to server
+                IDot temp_dot = IDot_FromFloat2(temp);
+
+                send(server_handle, &temp_dot, sizeof(IDot), 0);
                 DynArr_Push(&points, &temp);
             }
         }
@@ -121,24 +201,13 @@ int main(int argc, char *argv[]) {
         SDL_RenderPresent(renderer);
     }
 
+    // cleaning up
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
     SDL_Quit();
+
     DynArr_Free(points);
-
-    printf("Enter the message: ");
-    fgets(buffer, BUFFLEN, stdin);
-
-    // sending stuff to server
-    send(server_handle, buffer, strlen(buffer), 0);
-
-    memset(&buffer,0,BUFFLEN);
-
-    // receiving from server
-    recv(server_handle, buffer, BUFFLEN, 0);
-    printf("Server sent: %s\n", buffer);
-
-    // cleaning up
+    
     close(server_handle);
     return 0;
 }

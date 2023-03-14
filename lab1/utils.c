@@ -13,7 +13,11 @@ uint64_t timestamp_utc() {
     return milis;
 }
 
-uint64_t random_64bits(RandomGenerator rng_gen) {
+struct RngGenPrivate {
+    FILE *dev_random;
+};
+
+uint64_t RngGen_64bits(RngGen rng_gen) {
     uint64_t ret;
     assert(
         fread(
@@ -27,18 +31,23 @@ uint64_t random_64bits(RandomGenerator rng_gen) {
     return ret;
 }
 
-struct RngRand {
-    FILE *dev_random;
-};
-
-RandomGenerator RandomGenerator_new() {
-    RandomGenerator ret = calloc(sizeof(struct RngRand), 1);
+RngGen RngGen_new() {
+    RngGen ret = calloc(sizeof(struct RngGenPrivate), 1);
     ret->dev_random = fopen("/dev/urandom", "rb");
 
     return ret;
 }
 
-void RandomGenerator_free(RandomGenerator rng_gen) {
+void RngGen_free(RngGen rng_gen) {
     fclose(rng_gen->dev_random);
     free(rng_gen);
 }
+
+struct timeval timeval_FromMicro(int i) {
+    struct timeval ret = {
+        .tv_sec = 0,
+        .tv_usec = i,
+    };
+
+    return ret;
+} 
