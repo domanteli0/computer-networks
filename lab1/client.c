@@ -132,7 +132,7 @@ int main(int argc, char *argv[]) {
             FD_SET(server_handle, &read_set);
             struct timeval timeout = timeval_FromMicro(10000);
 
-            switch (select(server_handle, &read_set, NULL, NULL, &timeout)) {
+            switch (select(server_handle + 1, &read_set, NULL, NULL, &timeout)) {
                 case -1:
                     fprintf(stderr, "select error");
                     break;
@@ -146,12 +146,12 @@ int main(int argc, char *argv[]) {
 
                     int foo = 0;
                     // yay, let's read some data
-                    uint16_t type_id = 0;
+                    uint32_t type_id = 0;
 
                     int recv_bytes = recv(
                         server_handle,
                         &type_id,
-                        sizeof(uint16_t),
+                        sizeof(uint32_t),
                         0);
                         
                     printf("Bytes received: %i\n", recv_bytes);
@@ -160,7 +160,10 @@ int main(int argc, char *argv[]) {
                     // I was planning to more types than dots
                     // so just imagine type_id is checked and appropiate type is sellected
                     Float2 dot;
-                    recv(server_handle, &dot, sizeof(Float2), 0);
+                    recv_bytes = recv(server_handle, &dot, sizeof(Float2), 0);
+                    printf("Got %i bytes and a float2: %s\n\n", recv_bytes, Float2_ToString(dot));
+
+                    DynArr_Push(&points, &dot);
             }
 
         }
@@ -188,9 +191,10 @@ int main(int argc, char *argv[]) {
                 printf("Drawing dots\n");
 
                 Float2 temp = Float2_New(event.motion.x, event.motion.y);
-                IDot temp_dot = IDot_FromFloat2(temp);
+                IDotData temp_dot = IDot_FromFloat2(temp);
 
-                send(server_handle, &temp_dot, sizeof(IDot), 0);
+                send(server_handle, &temp_dot, sizeof(IDotData), 0);
+                printf("IDotData sent: %s\n", IDot_ToString(temp_dot));
                 DynArr_Push(&points, &temp);
             }
         }

@@ -17,7 +17,7 @@ run-server: build-server
     ./server {{PORT}}
 
 build-server:
-    clang server.c utils.c dynarr.c -o server {{CC_FLAGS}} 
+    clang server.c utils.c dynarr.c dict.c -o server {{CC_FLAGS}} 
 
 clean:
     rm client || true 

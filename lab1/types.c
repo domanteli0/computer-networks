@@ -47,7 +47,7 @@ char *Float2_ToString(Float2 this) {
 // } Canvas;
 
 typedef struct Header {
-    uint16_t type_id;
+    uint32_t type_id;
 } Header;
 
 typedef struct RGBA {
@@ -59,20 +59,20 @@ typedef struct RGBA {
 
 #define ITEM_DOT_TYPE_ID 0x0000
 
-typedef struct IDot {
-    uint16_t type_id;
+typedef struct __attribute__((packed)) IDotData {
+    uint32_t type_id;
     Float1 x;
     Float1 y;
-} IDot;
+} IDotData;
 
-char *IDot_ToString(IDot this) {
+char *IDot_ToString(IDotData this) {
     char *str = calloc(1024, 1);
     sprintf(str, "Type: 0x%x, x: %f, y: %f", this.type_id, this.x, this.y);
     return str;
 }
 
-IDot IDot_FromFloat2(Float2 f2) {
-    IDot ret = {
+IDotData IDot_FromFloat2(Float2 f2) {
+    IDotData ret = {
         .type_id = ITEM_DOT_TYPE_ID,
         .x = f2.x,
         .y = f2.y,
@@ -81,8 +81,8 @@ IDot IDot_FromFloat2(Float2 f2) {
     return ret;
 }
 
-IDot IDot_new(Float1 x, Float1 y) {
-    IDot ret = {
+IDotData IDot_New(Float1 x, Float1 y) {
+    IDotData ret = {
         .type_id = ITEM_DOT_TYPE_ID,
         .x = x,
         .y = y,
@@ -90,3 +90,42 @@ IDot IDot_new(Float1 x, Float1 y) {
 
     return ret;
 }
+
+// FIXME: Ideally, i would use different types
+// to not include client side rendering code
+// in the same struct that is used in the server side code
+// but im a bit too lazy to do this right now
+
+// data field is ready as is to be sent over the network
+typedef struct Item Item;
+struct Item {
+    void *data;
+    size_t size;
+
+    void (*Free)(Item);
+
+    // TODO:
+    void (*Render)();
+};
+
+typedef struct {
+    uint32_t type_size; // amount of data to read
+
+    // The returned type copies the data
+    // Thus the caller is responsible for calling Item->Free
+    // after use
+    //
+    // It is assumed that data does not contain the header
+    Item (*VoidToTyped)(void *data); // converts received bytes to a specific type
+} BytesConverter;
+
+// typedef struct IDog
+
+// Maps type_id's to BytesConverter structs 
+// The caller needs to call Dict_Free, 
+// after the use of this dictionary
+Dict TypeIdToBytesConverted() {
+    Dict ret = Dict_WithCapacity(1, sizeof(uint32_t), sizeof(BytesConverter));
+
+    return ret;
+} 

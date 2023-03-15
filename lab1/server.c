@@ -11,6 +11,7 @@
 #include <time.h>
 
 #include "dynarr.h"
+#include "dict.h"
 #include "types.c"
 
 #define MAXCLIENTS 10
@@ -108,7 +109,7 @@ int main(int argc, char *argv[]){
                 printf("Connected:  %s\n",inet_ntoa(clientaddr.sin_addr));
 
 				DynArr_ForEach(dots, Float2, dot, {
-					IDot temp = IDot_FromFloat2(*dot);
+					IDotData temp = IDot_FromFloat2(*dot);
 					send(client_id, &temp, sizeof(Float2), 0);
 				});
             }
@@ -117,22 +118,25 @@ int main(int argc, char *argv[]){
         for (size_t ix = 0; ix < MAXCLIENTS; ix++){
             if (c_sockets[ix] != -1){
                 if (FD_ISSET(c_sockets[ix], &read_set)){
-					IDot dot;
-                    int r_len = recv(c_sockets[ix],&dot,sizeof(IDot),0);
-					printf("Bytes rececived: %i, sizeof(%zu)\n", r_len, sizeof(IDot));
+					IDotData dot;
+                    int r_len = recv(c_sockets[ix],&dot,sizeof(IDotData),0);
+					printf("Bytes rececived: %i, sizeof(%zu)\n", r_len, sizeof(IDotData));
 					printf("%s\n", IDot_ToString(dot));
-					assert(r_len == sizeof(IDot));
+					assert(r_len == sizeof(IDotData));
 					DynArr_Push(&dots, &dot);
 
                     for (size_t jx = 0; jx < MAXCLIENTS; jx++) {
                         if (c_sockets[jx] != -1 && c_sockets[jx] != c_sockets[ix]){
                             int w_len = send(c_sockets[jx], &dot, r_len, 0);
+							printf("%i bytes sent, IDot: %s\n", w_len, IDot_ToString(dot));
                             if (w_len <= 0){
                                 close(c_sockets[jx]);
                                 c_sockets[jx] = -1;
                             }
                         }
                     }
+					
+					printf("--\n");
                 }
             }
         }
