@@ -18,15 +18,18 @@ DynArr DynArr_WithCapacity(size_t capacity, size_t size_of_elems);
 void *DynArr_Get(DynArr this, size_t pos);
 void DynArr_Push(DynArr *this, void *elem);
 void DynArr_Free(DynArr this);
+void *DynArr_FindWithPredicate(DynArr this, bool(pred)(void *));
+void *DynArr_Find(DynArr this, void *elem);
+// void DynArr_Filter(DynArr this, bool(pred)(void *));
+void DynArr_FilterOut(DynArr *this, void *elem_cmp);
 
 #define DynArr_ForEach(dyn_arr, type, elem, action) \
 { \
-    void *DYNARR_RESERVED_ADDR = dyn_arr.arr_ptr;\
     for (size_t DYNARR_RESERVED_INDEX = 0; DYNARR_RESERVED_INDEX < (dyn_arr).size; ++DYNARR_RESERVED_INDEX) { \
-        type *(elem) = DYNARR_RESERVED_ADDR; \
+        void *DYNARR_RESERVED_ADDR = (dyn_arr).arr_ptr + (DYNARR_RESERVED_INDEX * (dyn_arr).size_of_elem); \
+        type elem = *((type *) DYNARR_RESERVED_ADDR); \
         {\
             action \
         }\
-        DYNARR_RESERVED_ADDR += (dyn_arr).size_of_elem;\
     }\
 }

@@ -59,9 +59,20 @@ void DynArr_Free(DynArr this) {
     free(this.arr_ptr);
 }
 
+void *DynArr_Find(DynArr this, void *elem) {
+    void *current = this.arr_ptr;
+    for (size_t ix = 0; ix < this.size; ++ix) {
+        current += this.size_of_elem; 
+        if (memcmp(current, elem, this.size_of_elem) == 0) {
+            return current;
+        }
+    }
+
+    return NULL;
+}
 // return the address of the first element if the predicate returns true
 // else NULL
-void *DynArr_Find(DynArr this, bool(pred)(void *)) {
+void *DynArr_FindWithPredicate(DynArr this, bool(pred)(void *)) {
     for (size_t ix = 0; ix < this.size; ++ix) {
         void *current = this.arr_ptr + (ix * this.size_of_elem); 
         if (pred(current)) {
@@ -70,4 +81,33 @@ void *DynArr_Find(DynArr this, bool(pred)(void *)) {
     }
 
     return NULL;
+}
+
+// TODO:
+// This function is meant to deallocate memory if 
+// half of the array is empty
+void DynArr_resize(DynArr *this) {}
+
+void DynArr_FilterOut(DynArr *this, void *elem_cmp) {
+    size_t ix = 0;
+
+    void * current = this->arr_ptr;
+    while (ix < this->size) {
+        if (memcmp(current, elem_cmp, this->size_of_elem) != 0) {
+            ix += 1;
+            current += this->size_of_elem;
+            continue;
+        }
+
+        memmove(
+            current, 
+            current + this->size_of_elem,
+            this->size_of_elem * (this->size - ix)
+        );
+
+        this->size -= 1;
+    }
+
+    DynArr_resize(this);
+
 }

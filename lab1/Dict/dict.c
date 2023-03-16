@@ -35,8 +35,8 @@ void *Dict_Get(Dict this, void *key) {
     assert(this.dyn_arr.arr_ptr != NULL);
     assert(key != NULL);
 
-    DynArr_ForEach(this.dyn_arr, void, kvp, {
-        if (memcmp(kvp, key, this.key_size) == 0){
+    DynArr_ForEach(this.dyn_arr, unsigned char, kvp, {
+        if (memcmp(&kvp, key, this.key_size) == 0){
             return kvp + this.key_size;
         }
     });

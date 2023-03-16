@@ -17,13 +17,15 @@
 #include <sys/select.h>
 
 // TODO: use header files
-#include "types.c"
+#include "Types/types.c"
 
-#include "dynarr.h"
-#include "dict.h"
+#include "DynArr/dynarr.h"
+#include "Dict/dict.h"
 #include "utils.h"
 
 int connect_to(char *ipv4_addr, char *port);
+int CanRead(int fd, int timepout);
+void do_nothing() {}
 
 Float2 ScreenToCanvasPointTranslation(Float2 windowSize, Float2 positionInWindow) {
     // TODO: Implement translation
@@ -39,14 +41,14 @@ char *SDL_MouseMotionEventToString(SDL_MouseMotionEvent e) {
     return str;
 }
 
-typedef struct ClientState {
-    uint64_t identifier;
-    DynArr points;
-} ClientState;
+struct fd_set CanReadSet(int fd) {
+    struct fd_set read_set;
+    FD_ZERO(&read_set);
+    FD_SET(fd, &read_set);
 
-void do_nothing() {}
+    return read_set;
 
-// TODO: Translate mouse coordinates to Canvas coordinates
+}
 // TODO: waiting_to_send queue for failed sends
 int main(int argc, char *argv[]) {
     if (argc != 3){
@@ -72,24 +74,6 @@ int main(int argc, char *argv[]) {
             exit(EXIT_FAILURE);
     }
 
-    ClientState client_state = {
-        .identifier = 0,
-        .points = DynArr_WithCapacity(1024, sizeof(Float2)),
-    };
-
-    // recv(server_handle, &client_state.identifier, sizeof(uint32_t), 0);
-    // printf("ident: %u\n", client_state.identifier);
-
-    // recv(server_handle, &client_state.identifier, sizeof(uint32_t), 0);
-    // printf("ident: %u\n", client_state.identifier);
-
-    // printf("nothing looks like: %i\n", recv(
-    //     server_handle,
-    //     &client_state,
-    //     sizeof(__uint128_t),
-    //     0
-    // ));
-
     SDL_Window *window;
     SDL_Renderer *renderer;
     SDL_Surface *surface;
@@ -110,10 +94,6 @@ int main(int argc, char *argv[]) {
 
     // TODO: retrieve state
 
-    fd_set read_fds;
-    FD_ZERO(&read_fds);
-    FD_SET(server_handle, &read_fds);
-
     while (1) {
         SDL_PollEvent(&event);
 
@@ -126,13 +106,11 @@ int main(int argc, char *argv[]) {
 
         // handle receiving data 
         {
-            // this set consists only of one handle, that is the server
-            fd_set read_set;
-            FD_ZERO(&read_set);
-            FD_SET(server_handle, &read_set);
+            fd_set read_set = CanReadSet(server_handle);
             struct timeval timeout = timeval_FromMicro(10000);
 
             switch (select(server_handle + 1, &read_set, NULL, NULL, &timeout)) {
+            // switch (CanRead(server_handle, 1000000)) {
                 case -1:
                     fprintf(stderr, "select error");
                     break;
@@ -144,8 +122,6 @@ int main(int argc, char *argv[]) {
 
                     printf("About to receive some bytes\n");
 
-                    int foo = 0;
-                    // yay, let's read some data
                     uint32_t type_id = 0;
 
                     int recv_bytes = recv(
@@ -155,7 +131,7 @@ int main(int argc, char *argv[]) {
                         0);
                         
                     printf("Bytes received: %i\n", recv_bytes);
-                    assert(recv_bytes == sizeof(Header));
+                    assert(recv_bytes == sizeof(uint32_t));
 
                     // I was planning to more types than dots
                     // so just imagine type_id is checked and appropiate type is sellected
@@ -191,10 +167,10 @@ int main(int argc, char *argv[]) {
                 printf("Drawing dots\n");
 
                 Float2 temp = Float2_New(event.motion.x, event.motion.y);
-                IDotData temp_dot = IDot_FromFloat2(temp);
+                IDotData temp_dot = IDotData_FromFloat2(temp);
 
                 send(server_handle, &temp_dot, sizeof(IDotData), 0);
-                printf("IDotData sent: %s\n", IDot_ToString(temp_dot));
+                printf("IDotData sent: %s\n", IDotData_ToString(temp_dot));
                 DynArr_Push(&points, &temp);
             }
         }
@@ -214,6 +190,16 @@ int main(int argc, char *argv[]) {
     
     close(server_handle);
     return 0;
+}
+
+int CanRead(int fd, int timeout) {
+    struct fd_set read_set = CanReadSet(fd);
+
+    struct timeval timeout_s = timeval_FromMicro(timeout);
+
+    int ret = select(fd, &read_set, NULL, NULL, &timeout); 
+
+    return ret;
 }
 
 #define CONNECT_INVALID_PORT -1

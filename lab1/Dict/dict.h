@@ -1,6 +1,6 @@
 #pragma once
 
-#include "dynarr.h"
+#include "../DynArr/dynarr.h"
 
 typedef struct Dict {
     DynArr dyn_arr;
