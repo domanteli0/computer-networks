@@ -51,3 +51,22 @@ struct timeval timeval_FromMicro(int i) {
 
     return ret;
 } 
+
+struct fd_set fd_set_Singleton(int fd) {
+    struct fd_set read_set;
+	memset(&read_set, 0, sizeof(fd_set));	
+    FD_ZERO(&read_set);
+    FD_SET(fd, &read_set);
+
+    return read_set;
+}
+
+int SelectOne(int fd, int timeout) {
+    struct fd_set read_set = fd_set_Singleton(fd);
+
+    struct timeval timeout_s = timeval_FromMicro(timeout);
+
+    int ret = select(fd + 1, &read_set, NULL, NULL, &timeout_s); 
+
+    return ret;
+}

@@ -23,8 +23,8 @@
 #include "Dict/dict.h"
 #include "utils.h"
 
-int connect_to(char *ipv4_addr, char *port);
-int CanRead(int fd, int timepout);
+int TCP_ConnectTo(char *ipv4_addr, char *port);
+int SelectOne(int fd, int timepout);
 void do_nothing() {}
 
 Float2 ScreenToCanvasPointTranslation(Float2 windowSize, Float2 positionInWindow) {
@@ -41,14 +41,6 @@ char *SDL_MouseMotionEventToString(SDL_MouseMotionEvent e) {
     return str;
 }
 
-struct fd_set CanReadSet(int fd) {
-    struct fd_set read_set;
-    FD_ZERO(&read_set);
-    FD_SET(fd, &read_set);
-
-    return read_set;
-
-}
 // TODO: waiting_to_send queue for failed sends
 int main(int argc, char *argv[]) {
     if (argc != 3){
@@ -56,8 +48,9 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     }
 
-    int server_handle = connect_to(argv[1], argv[2]);
+    int server_handle = TCP_ConnectTo(argv[1], argv[2]);
 
+    printf("Succesfull connect\n");
 
     switch (server_handle) {
         case -1:
@@ -106,11 +99,11 @@ int main(int argc, char *argv[]) {
 
         // handle receiving data 
         {
-            fd_set read_set = CanReadSet(server_handle);
+            fd_set read_set = fd_set_Singleton(server_handle);
             struct timeval timeout = timeval_FromMicro(10000);
 
             switch (select(server_handle + 1, &read_set, NULL, NULL, &timeout)) {
-            // switch (CanRead(server_handle, 1000000)) {
+            // switch (SelectOne(server_handle, 1000)) {
                 case -1:
                     fprintf(stderr, "select error");
                     break;
@@ -131,6 +124,8 @@ int main(int argc, char *argv[]) {
                         0);
                         
                     printf("Bytes received: %i\n", recv_bytes);
+                    // TODO: handle this assertion,
+                    // in case of server failure, this return 0
                     assert(recv_bytes == sizeof(uint32_t));
 
                     // I was planning to more types than dots
@@ -192,15 +187,6 @@ int main(int argc, char *argv[]) {
     return 0;
 }
 
-int CanRead(int fd, int timeout) {
-    struct fd_set read_set = CanReadSet(fd);
-
-    struct timeval timeout_s = timeval_FromMicro(timeout);
-
-    int ret = select(fd, &read_set, NULL, NULL, &timeout); 
-
-    return ret;
-}
 
 #define CONNECT_INVALID_PORT -1
 #define CONNECT_SOCKET_INIT_ERR -2
@@ -212,8 +198,8 @@ int CanRead(int fd, int timeout) {
 // -2  | Failure to create a socket
 // -3  | Invalid IP address
 // -4  | Failure to connect
-int connect_to(char *ipv4_addr, char *port_str) {
-struct sockaddr_in servaddr; // Serverio address struct
+int TCP_ConnectTo(char *ipv4_addr, char *port_str) {
+    struct sockaddr_in servaddr; // Serverio address struct
 
     // port validation
     int port = atoi(port_str);
