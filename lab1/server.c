@@ -15,6 +15,7 @@
 
 #include "DynArr/dynarr.h"
 #include "Dict/dict.h"
+#include "Types/types.h"
 #include "Types/floatx.h"
 #include "Types/idot.h"
 #include "Types/header.h"
@@ -63,6 +64,7 @@ int main(int argc, char *argv[])
 		return -1;
 	}
 
+	void *item_buf = calloc(MAX_TYPE_SIZE, 1);
 	DynArr c_sockets = DynArr_WithCapacity(8, sizeof(int));
     fd_set read_set;
 
@@ -91,12 +93,12 @@ int main(int argc, char *argv[])
 
 	printf("l_socket: %i\n", l_socket);
 
-	DynArr dots = DynArr_WithCapacity(1024, sizeof(Float2));
+	DynArr dots = DynArr_WithCapacity(1024, sizeof(IDotData));
 
 	// this array is pre-filled only for testing purposes
 	for (size_t ix = 0; ix < 128; ++ix)
 	{
-		Float2 temp = Float2_New((float)ix, (float)ix);
+		IDotData temp = IDotData_New((float)ix, (float)ix);
 		DynArr_Push(&dots, &temp);
 	}
 
@@ -104,17 +106,14 @@ int main(int argc, char *argv[])
 	{
 		// shutdown gracefully if instructed
 		if (GetCharIfAny(STDIN_FILENO, timeval_FromMicro(100)) == 'q')
-		{
 			break;
-		}
 
 		FD_ZERO(&read_set);
 		DynArr_ForEach(c_sockets, int, c_sock, {
 			FD_SET(c_sock, &read_set);
+			// maxfd = c_sock > maxfd ? c_sock : maxfd;
 			if (c_sock > maxfd)
-			{
 				maxfd = c_sock;
-			}
 		});
 
 		FD_SET(l_socket, &read_set);
@@ -137,49 +136,43 @@ int main(int argc, char *argv[])
 			memset(&clientaddr, 0, clientaddrlen);
 
 			int new_con = accept(l_socket,
-								 (struct sockaddr *)&clientaddr, &clientaddrlen);
+								 (struct sockaddr *) &clientaddr, &clientaddrlen);
 
 			DynArr_Push(&c_sockets, &new_con);
 
 			printf("Connected:  %s\n", inet_ntoa(clientaddr.sin_addr));
 
-			DynArr_ForEach(dots, Float2, dot, {
+			DynArr_ForEach(dots, IDotData, dot, {
 				printf("Sending init bytes: (%f, %f)\n", dot.x, dot.y);
-				IDotData temp = IDotData_FromFloat2(dot);
-				printf("Sending init bytes: (%f, %f)\n\n", temp.x, temp.y);
-				TCP_Send(&new_con, &temp, sizeof(IDotData), 0);
+				TCP_Send(&new_con, &dot, sizeof(IDotData), 0);
 				fflush(stdout);	
 			});
 		}
 
 		DynArr_ForEach(c_sockets, int, ci_sock, {
 			if (!FD_ISSET(ci_sock, &read_set))
-			{
 				continue;
-			}
 
-			printf("Doing some network things\n");
+			printf("About to read from the netwrok socket\n");
 
-			int i_sock = ci_sock;
+			int r1_len = TCP_Recv(&ci_sock, item_buf, sizeof(DrawableHeader), 0);
+			int r2_len = TCP_Recv(&ci_sock, ((DrawableHeader *) item_buf) + 1, ((DrawableHeader *)item_buf)->size, 0);
+			int r_len = r1_len + r2_len;
+			printf("Bytes rececived: %i + %i = %i\n", r1_len, r2_len, r_len);
+			printf("%s\n", IDotData_ToString( *((IDotData *) item_buf) ));
 
-			IDotData dot;
-			int r_len = TCP_Recv(&i_sock, &dot, sizeof(IDotData), 0);
-			printf("Bytes rececived: %i\n", r_len);
-			printf("%s\n", IDotData_ToString(dot));
-			// assert(r_len == sizeof(IDotData));
-			DynArr_Push(&dots, &dot.x);
+			if (r1_len < 0 || r2_len < 0)
+				continue; 
+
+			DynArr_Push(&dots, item_buf);
 
 			void *temp_ptr = DYNARR_RESERVED_ADDR;
 			DynArr_ForEach(c_sockets, int, cj_sock, {
-				int j_sock = cj_sock;
-
-				if (j_sock == i_sock)
-				{
+				if (cj_sock == ci_sock)
 					continue;
-				}
 
-				int w_len = TCP_Send(&j_sock, &dot, r_len, 0);
-				printf("%i bytes sent, IDot: %s\n", w_len, IDotData_ToString(dot));
+				int w_len = TCP_Send(&cj_sock, item_buf, r_len, 0);
+				printf("%i bytes sent, IDot: %s\n", w_len, IDotData_ToString(*((IDotData *) item_buf) ));
 			});
 			DYNARR_RESERVED_ADDR = temp_ptr;
 
@@ -190,13 +183,16 @@ int main(int argc, char *argv[])
 		DynArr_FilterOut(&c_sockets, &filter);
 	}
 
-	DynArr_ForEach(dots, Float2, dot, {
+	DynArr_ForEach(dots, IDotData, dot, {
 		printf("Ending dot: (%f, %f)\n", dot.x, dot.y);
 	});
 
 	DynArr_ForEach(c_sockets, int, sock, {
 		close(sock);
 	});
+
+	free(item_buf);
+
 	close(l_socket);
 	DynArr_Free(c_sockets);
 

@@ -5,7 +5,7 @@ CC_FLAGS := '-W \
     -Wextra \
     -g'
 
-INCLUDE_ALL := 'DynArr/dynarr.c Dict/dict.c utils.c Types/idot.c Types/floatx.c Types/header.c'
+INCLUDE_ALL := 'DynArr/dynarr.c Dict/dict.c utils.c Types/idot.c Types/iline.c Types/floatx.c Types/header.c'
 
 run-client: build-client
     ./client 127.0.0.1 {{PORT}}
@@ -25,7 +25,7 @@ run-tests: build-tests
     ./test
 
 build-tests:
-    clang Testst/test.c {{INCLUDE_ALL}} {{CC_FLAGS}} -o test
+    clang Tests/test.c {{INCLUDE_ALL}} {{CC_FLAGS}} -o test
 
 clean:
     rm client || true 

@@ -79,6 +79,7 @@ int TCP_Send(int *fd, void *data, size_t size, int flags) {
     // TO ASK: what do kai `send()` grazina tarp 0 ir size 
     int send_len = send(*fd, data, size, flags);
     if (send_len < 0 || send_len < (int) size) {
+        fprintf(stderr, "Send of size %zu failed, closing handle %i\n", size, *fd);
         close(*fd);
         *fd = -1;
     }
@@ -93,6 +94,7 @@ int TCP_Recv(int *fd, void *data, size_t size, int flags) {
     
     int recv_len = recv(*fd, data, size, flags);
     if (recv_len < 1 || recv_len < (int) size) {
+        fprintf(stderr, "Recv of size %zu failed, closing handle: %i\n", size, *fd);
         close(*fd);
         *fd = -1;
     }

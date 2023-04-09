@@ -18,6 +18,7 @@
 
 // #include "Types/types.h"
 #include "Types/idot.h"
+#include "Types/iline.h"
 #include "Types/floatx.h"
 #include "DynArr/dynarr.h"
 #include "Dict/dict.h"
@@ -25,7 +26,7 @@
 
 int TCP_ConnectTo(char *ipv4_addr, char *port);
 int SelectSingleton(int fd, int timepout);
-void do_nothing() {}
+void do_nothing(void) {}
 
 Float2 ScreenToCanvasPointTranslation(Float2 windowSize, Float2 positionInWindow) {
     // TODO: Implement translation
@@ -95,6 +96,7 @@ int main(int argc, char *argv[]) {
     }
 
     DynArr points = DynArr_WithCapacity(2 * 1024, sizeof(Float2));
+    DynArr lines = DynArr_WithCapacity(128, sizeof(ILine));
     State state = {
         .connected = true
     };
@@ -135,18 +137,11 @@ int main(int argc, char *argv[]) {
                         .type_id = -1,
                     };
 
-                    int recv_bytes = recv(
-                        server_handle,
+                    int recv_bytes = TCP_Recv(
+                        &server_handle,
                         &header,
                         sizeof(DrawableHeader),
                         0);
-
-                    if (recv_bytes == -1) {
-                        // TODO: pop window
-                        printf("failed `recv`, exiting");
-                        state.connected = false;
-                        break;
-                    }
                         
                     printf("Bytes received: %i\n", recv_bytes);
                     printf("of type_id: 0x%" PRIX16 "\n", header.type_id);
@@ -154,9 +149,14 @@ int main(int argc, char *argv[]) {
                     // I was planning to more types than dots
                     // so just imagine type_id is checked and appropiate type is sellected
                     Float2 dot;
-                    recv_bytes = recv(server_handle, &dot, sizeof(Float2), 0);
+                    recv_bytes = TCP_Recv(&server_handle, &dot, sizeof(Float2), 0);
                     printf("Got %i bytes and a float2: %s\n\n", recv_bytes, Float2_ToString(dot));
 
+                    if (recv_bytes == -1) {
+                        // TODO: pop window
+                        state.connected = false;
+                        break;
+                    }
                     DynArr_Push(&points, &dot);
             }
 
@@ -193,7 +193,7 @@ int main(int argc, char *argv[]) {
 
                 printf("Values arth:  Size: %" PRIu16 ", Type: 0x%" PRIX16 " (%f %f)\n",
                     *(((uint16_t *) t_ptr) + 1),
-                    *t_ptr,
+                    *(uint16_t *) t_ptr,
                     *((Float1 *) (t_ptr + 1)),
                     *((Float1 *) (t_ptr + 2))
                 );
@@ -202,15 +202,13 @@ int main(int argc, char *argv[]) {
                 int send_len = TCP_Send(&server_handle, &temp_dot, sizeof(IDotData), 0);
 
                 if (send_len == -1) {
-                    printf("`send` failed, exiting.\n");
                     break;
                 }
-                
+
                 DynArr_Push(&points, &temp_f2);
             }
 
             if (server_handle == -1) {
-                printf("Connection to the server severed\n");
                 break;
             }
         }

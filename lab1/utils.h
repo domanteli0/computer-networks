@@ -12,6 +12,8 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
+#define TCP_RECV(fd, data, size, flags) if (TCP_Recv(fd, data, size, flags) < 0) { continue; }
+
 struct RngGenPrivate;
 typedef struct RngGenPrivate *RngGen; 
 
