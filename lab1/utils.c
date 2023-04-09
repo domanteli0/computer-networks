@@ -70,3 +70,32 @@ int SelectOne(int fd, int timeout) {
 
     return ret;
 }
+
+// wraps `send()` calls, sets fd to -1, in case of failure
+int TCP_Send(int *fd, void *data, size_t size, int flags) {
+    if (*fd == -1)
+        return -1;
+
+    // TO ASK: what do kai `send()` grazina tarp 0 ir size 
+    int send_len = send(*fd, data, size, flags);
+    if (send_len < 0 || send_len < (int) size) {
+        close(*fd);
+        *fd = -1;
+    }
+    
+    return send_len;
+}
+
+// wraps `recv()` calls, sets fd to -1, in case of failure
+int TCP_Recv(int *fd, void *data, size_t size, int flags) {
+    if (*fd == -1)
+        return -1;
+    
+    int recv_len = recv(*fd, data, size, flags);
+    if (recv_len < 1 || recv_len < (int) size) {
+        close(*fd);
+        *fd = -1;
+    }
+    
+    return recv_len;
+}

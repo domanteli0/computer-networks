@@ -15,7 +15,9 @@
 
 #include "DynArr/dynarr.h"
 #include "Dict/dict.h"
-#include "Types/types.c"
+#include "Types/floatx.h"
+#include "Types/idot.h"
+#include "Types/header.h"
 #include "utils.h"
 
 #define MAXCLIENTS 10
@@ -98,8 +100,6 @@ int main(int argc, char *argv[])
 		DynArr_Push(&dots, &temp);
 	}
 
-	printf("dots.size %zu\n", dots.size);
-
 	while (true)
 	{
 		// shutdown gracefully if instructed
@@ -143,17 +143,13 @@ int main(int argc, char *argv[])
 
 			printf("Connected:  %s\n", inet_ntoa(clientaddr.sin_addr));
 
-			for (size_t DYNARR_RESERVED_INDEX = 0; DYNARR_RESERVED_INDEX < (dots).size; ++DYNARR_RESERVED_INDEX)
-			{
-				void *DYNARR_RESERVED_ADDR = (dots).arr_ptr + (DYNARR_RESERVED_INDEX * (dots).size_of_elem);
-				Float2 dot = *((Float2 *)DYNARR_RESERVED_ADDR);
-				{
-					printf("Sending init bytes\n");
-					fflush(stdout);
-					IDotData temp = IDotData_FromFloat2(dot);
-					send(new_con, &temp, sizeof(IDotData), 0);
-				}
-			}
+			DynArr_ForEach(dots, Float2, dot, {
+				printf("Sending init bytes: (%f, %f)\n", dot.x, dot.y);
+				IDotData temp = IDotData_FromFloat2(dot);
+				printf("Sending init bytes: (%f, %f)\n\n", temp.x, temp.y);
+				TCP_Send(&new_con, &temp, sizeof(IDotData), 0);
+				fflush(stdout);	
+			});
 		}
 
 		DynArr_ForEach(c_sockets, int, ci_sock, {
@@ -167,11 +163,11 @@ int main(int argc, char *argv[])
 			int i_sock = ci_sock;
 
 			IDotData dot;
-			int r_len = recv(i_sock, &dot, sizeof(IDotData), 0);
-			printf("Bytes rececived: %i, sizeof(%zu)\n", r_len, sizeof(IDotData));
+			int r_len = TCP_Recv(&i_sock, &dot, sizeof(IDotData), 0);
+			printf("Bytes rececived: %i\n", r_len);
 			printf("%s\n", IDotData_ToString(dot));
 			// assert(r_len == sizeof(IDotData));
-			DynArr_Push(&dots, &dot);
+			DynArr_Push(&dots, &dot.x);
 
 			void *temp_ptr = DYNARR_RESERVED_ADDR;
 			DynArr_ForEach(c_sockets, int, cj_sock, {
@@ -182,13 +178,8 @@ int main(int argc, char *argv[])
 					continue;
 				}
 
-				int w_len = send(j_sock, &dot, r_len, 0);
+				int w_len = TCP_Send(&j_sock, &dot, r_len, 0);
 				printf("%i bytes sent, IDot: %s\n", w_len, IDotData_ToString(dot));
-				if (w_len <= 0)
-				{
-					close(j_sock);
-					j_sock = -1;
-				}
 			});
 			DYNARR_RESERVED_ADDR = temp_ptr;
 
@@ -198,6 +189,10 @@ int main(int argc, char *argv[])
 		int filter = -1;
 		DynArr_FilterOut(&c_sockets, &filter);
 	}
+
+	DynArr_ForEach(dots, Float2, dot, {
+		printf("Ending dot: (%f, %f)\n", dot.x, dot.y);
+	});
 
 	DynArr_ForEach(c_sockets, int, sock, {
 		close(sock);

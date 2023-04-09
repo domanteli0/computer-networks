@@ -9,6 +9,9 @@
 #include <string.h>
 #include <stdbool.h>
 
+#include <sys/socket.h>
+#include <unistd.h>
+
 struct RngGenPrivate;
 typedef struct RngGenPrivate *RngGen; 
 
@@ -19,3 +22,5 @@ RngGen RngGen_new();
 void RngGen_free(RngGen rng_gen);
 struct timeval timeval_FromMicro(int micro_seconds);
 struct fd_set fd_set_Singleton(int fd);
+int TCP_Send(int *fd, void *data, size_t size, int flags);
+int TCP_Recv(int *fd, void *data, size_t size, int flags);

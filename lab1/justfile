@@ -5,11 +5,13 @@ CC_FLAGS := '-W \
     -Wextra \
     -g'
 
+INCLUDE_ALL := 'DynArr/dynarr.c Dict/dict.c utils.c Types/idot.c Types/floatx.c Types/header.c'
+
 run-client: build-client
     ./client 127.0.0.1 {{PORT}}
 
 build-client:
-    clang client.c DynArr/dynarr.c Dict/dict.c utils.c -o client -lSDL2 {{CC_FLAGS}} \
+    clang client.c -o client -lSDL2 {{CC_FLAGS}} {{INCLUDE_ALL}} \
     -I /opt/homebrew/include \
     -L /opt/homebrew/lib \
 
@@ -17,7 +19,13 @@ run-server: build-server
     ./server {{PORT}}
 
 build-server:
-    clang server.c utils.c DynArr/dynarr.c Dict/dict.c -o server {{CC_FLAGS}} 
+    clang server.c {{INCLUDE_ALL}} -o server {{CC_FLAGS}}
+
+run-tests: build-tests
+    ./test
+
+build-tests:
+    clang Testst/test.c {{INCLUDE_ALL}} {{CC_FLAGS}} -o test
 
 clean:
     rm client || true 
