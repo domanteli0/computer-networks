@@ -20,9 +20,12 @@
 #include "Types/idot.h"
 #include "Types/iline.h"
 #include "Types/floatx.h"
+#include "Types/types.h"
 #include "DynArr/dynarr.h"
 #include "Dict/dict.h"
 #include "utils.h"
+
+#define MIN(a,b) ((a) > (b)) ? (a) : (b) 
 
 int TCP_ConnectTo(char *ipv4_addr, char *port);
 int SelectSingleton(int fd, int timepout);
@@ -95,11 +98,18 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
+    void *item_buf = calloc(MAX_TYPE_SIZE, 1);
+    DrawableHeader *header_buf = (DrawableHeader *) item_buf;
+    void *data_buf = header_buf + 1;
+
     DynArr points = DynArr_WithCapacity(2 * 1024, sizeof(Float2));
     DynArr lines = DynArr_WithCapacity(128, sizeof(ILine));
     State state = {
         .connected = true
     };
+
+    Float4 temp_f4 = Float4_New(200, 200, 200, 300);
+    DynArr_Push(&lines, &temp_f4);
 
     // TODO: retrieve state
 
@@ -132,32 +142,39 @@ int main(int argc, char *argv[]) {
 
                     printf("About to receive some bytes\n");
 
-                    DrawableHeader header = {
-                        .size = 0,
-                        .type_id = -1,
-                    };
-
                     int recv_bytes = TCP_Recv(
                         &server_handle,
-                        &header,
+                        header_buf,
                         sizeof(DrawableHeader),
                         0);
                         
-                    printf("Bytes received: %i\n", recv_bytes);
-                    printf("of type_id: 0x%" PRIX16 "\n", header.type_id);
+                    printf("Header received [ TYPE: 0x%" PRIX16 " | SIZE: %" PRIu16 " ]\n", header_buf->type_id, header_buf->size);
 
                     // I was planning to more types than dots
                     // so just imagine type_id is checked and appropiate type is sellected
-                    Float2 dot;
-                    recv_bytes = TCP_Recv(&server_handle, &dot, sizeof(Float2), 0);
-                    printf("Got %i bytes and a float2: %s\n\n", recv_bytes, Float2_ToString(dot));
+
+                    // TODO: use min of header size and max type size, for recv
+                    recv_bytes = TCP_Recv(&server_handle, data_buf, header_buf->size, 0);
+                    printf("Got %" PRIu16 " bytes\n", recv_bytes);
 
                     if (recv_bytes == -1) {
                         // TODO: pop window
                         state.connected = false;
                         break;
                     }
-                    DynArr_Push(&points, &dot);
+
+                    switch (header_buf->type_id)
+                    {
+                    case ITEM_DOT_TYPE_ID:
+                        DynArr_Push(&points, data_buf);
+                        break;
+                    case ITEM_LINE_TYPE_ID:
+                        DynArr_Push(&lines, data_buf); 
+                        break;
+                    default:
+                        printf("Got a malformed message\n");
+                        break;
+                    }
             }
 
         }
@@ -216,12 +233,17 @@ int main(int argc, char *argv[]) {
         SDL_SetRenderDrawColor(renderer, 0xFF, 0xFF, 0xFF, 0xFF);
         SDL_RenderDrawPointsF(renderer, points.arr_ptr, points.size);
 
+        DynArr_ForEachPtr(lines, el, {
+            SDL_RenderDrawLinesF(renderer, el, 2);
+        });
         SDL_RenderPresent(renderer);
 
         if (server_handle < 0) {
             printf("Connection to the server has been severed.\n");
             break;
         }
+
+        memset(item_buf, 0, MAX_TYPE_SIZE);
     }
 
 	DynArr_ForEach(points, Float2, dot, {

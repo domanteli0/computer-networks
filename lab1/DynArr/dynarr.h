@@ -33,3 +33,14 @@ void DynArr_FilterOut(DynArr *this, void *elem_cmp);
         }\
     }\
 }
+
+#define DynArr_ForEachPtr(dyn_arr, elem, action) \
+{ \
+    for (size_t DYNARR_RESERVED_INDEX = 0; DYNARR_RESERVED_INDEX < (dyn_arr).size; ++DYNARR_RESERVED_INDEX) { \
+        void *elem = (dyn_arr).arr_ptr + (DYNARR_RESERVED_INDEX * (dyn_arr).size_of_elem); \
+        {\
+            action \
+        }\
+    }\
+}
+

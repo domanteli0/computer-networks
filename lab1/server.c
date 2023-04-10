@@ -26,7 +26,10 @@
 
 char GetCharIfAny(int fd, struct timeval timeout);
 
-int TCP_BindAndListen(char *port_str, struct sockaddr_in *servaddr) {
+int TCP_BindAndListen(char *port_str) {
+	struct sockaddr_in servaddr;
+	memset(&servaddr, 0, sizeof(struct sockaddr_in));
+
 	int port = atoi(port_str);
 	int l_socket = 0;
 
@@ -39,12 +42,11 @@ int TCP_BindAndListen(char *port_str, struct sockaddr_in *servaddr) {
 		return -2;
 	}
 
-	memset(servaddr, 0, sizeof(*servaddr));
-	servaddr->sin_family = AF_INET;
-	servaddr->sin_addr.s_addr = htonl(INADDR_ANY);
-	servaddr->sin_port = htons(port);
+	servaddr.sin_family = AF_INET;
+	servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
+	servaddr.sin_port = htons(port);
 
-	if (bind(l_socket, (struct sockaddr *)servaddr, sizeof(*servaddr)) < 0)
+	if (bind(l_socket, &servaddr, sizeof(servaddr)) < 0)
 	{
 		return -3;
 	}
@@ -54,6 +56,19 @@ int TCP_BindAndListen(char *port_str, struct sockaddr_in *servaddr) {
 	}
 
 	return l_socket;
+}
+
+int TCP_Accept(int socket) {
+	struct sockaddr_in clientaddr;
+	unsigned int clientaddrlen = sizeof(clientaddr);
+	memset(&clientaddr, 0, clientaddrlen);
+
+	int new_con = accept(socket,
+		(struct sockaddr *) &clientaddr, &clientaddrlen);
+
+	printf("Connected:  %s\n", inet_ntoa(clientaddr.sin_addr));
+
+	return new_con;
 }
 
 int main(int argc, char *argv[])
@@ -69,11 +84,8 @@ int main(int argc, char *argv[])
     fd_set read_set;
 
 	int l_socket;
-	struct sockaddr_in servaddr;
-	struct sockaddr_in clientaddr;
-	int maxfd = 0;
 
-	switch (l_socket = TCP_BindAndListen(argv[1], &servaddr))
+	switch (l_socket = TCP_BindAndListen(argv[1]))
 	{
 		case -1:
 			fprintf(stderr, "ERROR #1: invalid port specified.\n");
@@ -91,15 +103,18 @@ int main(int argc, char *argv[])
 			break;
 	}
 
-	printf("l_socket: %i\n", l_socket);
-
-	DynArr dots = DynArr_WithCapacity(1024, sizeof(IDotData));
+	DynArr items = DynArr_WithCapacity(1024, MAX_TYPE_SIZE);
 
 	// this array is pre-filled only for testing purposes
 	for (size_t ix = 0; ix < 128; ++ix)
 	{
 		IDotData temp = IDotData_New((float)ix, (float)ix);
-		DynArr_Push(&dots, &temp);
+		DynArr_Push(&items, &temp);
+	}
+
+	for (size_t ix = 10; ix < 100; ix += 10) {
+		ILine temp = ILine_New(ix, ix, ix, ix + 10);
+		DynArr_Push(&items, &temp);
 	}
 
 	while (true)
@@ -108,22 +123,14 @@ int main(int argc, char *argv[])
 		if (GetCharIfAny(STDIN_FILENO, timeval_FromMicro(100)) == 'q')
 			break;
 
-		FD_ZERO(&read_set);
-		DynArr_ForEach(c_sockets, int, c_sock, {
-			FD_SET(c_sock, &read_set);
-			// maxfd = c_sock > maxfd ? c_sock : maxfd;
-			if (c_sock > maxfd)
-				maxfd = c_sock;
-		});
-
-		FD_SET(l_socket, &read_set);
-		if (l_socket > maxfd)
-		{
-			maxfd = l_socket;
-		}
+		int maxfd = fd_set_FromArrWithServerFD(
+			&read_set,
+			c_sockets.arr_ptr,
+			c_sockets.size,
+			l_socket
+		);
 
 		struct timeval network_timeout = timeval_FromMicro(100);
-
 		select(maxfd + 1, &read_set, NULL, NULL, &network_timeout);
 
 		bool new_incoming = FD_ISSET(l_socket, &read_set);
@@ -132,19 +139,19 @@ int main(int argc, char *argv[])
 		if (new_incoming && can_accept)
 		{
 			printf("ATTEMPTING TO ACCEPT NEW CON\n");
-			unsigned int clientaddrlen = sizeof(clientaddr);
-			memset(&clientaddr, 0, clientaddrlen);
 
-			int new_con = accept(l_socket,
-								 (struct sockaddr *) &clientaddr, &clientaddrlen);
+			int new_con = TCP_Accept(l_socket);
+			if (new_con != -1)
+				DynArr_Push(&c_sockets, &new_con);
 
-			DynArr_Push(&c_sockets, &new_con);
-
-			printf("Connected:  %s\n", inet_ntoa(clientaddr.sin_addr));
-
-			DynArr_ForEach(dots, IDotData, dot, {
-				printf("Sending init bytes: (%f, %f)\n", dot.x, dot.y);
-				TCP_Send(&new_con, &dot, sizeof(IDotData), 0);
+			DynArr_ForEachPtr(items, item_ptr, {
+				printf(
+					"Sending a thing, header [TYPE: 0x%" PRIx16 " | SIZE: %" PRIu16 " ]\n",
+					((DrawableHeader *) item_ptr)->type_id,	
+					((DrawableHeader *) item_ptr)->size	
+				);
+				
+				TCP_Send(&new_con, item_ptr, ((DrawableHeader *) item_ptr)->size + sizeof(DrawableHeader), 0);
 				fflush(stdout);	
 			});
 		}
@@ -153,18 +160,22 @@ int main(int argc, char *argv[])
 			if (!FD_ISSET(ci_sock, &read_set))
 				continue;
 
-			printf("About to read from the netwrok socket\n");
+			printf("About to read from the network socket\n");
 
 			int r1_len = TCP_Recv(&ci_sock, item_buf, sizeof(DrawableHeader), 0);
 			int r2_len = TCP_Recv(&ci_sock, ((DrawableHeader *) item_buf) + 1, ((DrawableHeader *)item_buf)->size, 0);
 			int r_len = r1_len + r2_len;
 			printf("Bytes rececived: %i + %i = %i\n", r1_len, r2_len, r_len);
-			printf("%s\n", IDotData_ToString( *((IDotData *) item_buf) ));
+			// printf("%s\n", IDotData_ToString( *((IDotData *) item_buf) ));
 
 			if (r1_len < 0 || r2_len < 0)
 				continue; 
+			
+			assert(r1_len > 0);
+			assert(r2_len > 0);
+			assert(r_len > 0);
 
-			DynArr_Push(&dots, item_buf);
+			DynArr_Push(&items, item_buf);
 
 			void *temp_ptr = DYNARR_RESERVED_ADDR;
 			DynArr_ForEach(c_sockets, int, cj_sock, {
@@ -183,8 +194,8 @@ int main(int argc, char *argv[])
 		DynArr_FilterOut(&c_sockets, &filter);
 	}
 
-	DynArr_ForEach(dots, IDotData, dot, {
-		printf("Ending dot: (%f, %f)\n", dot.x, dot.y);
+	DynArr_ForEach(items, DrawableHeader, header, {
+		printf("Ending header [ TYPE: 0x%" PRIx16 " | SIZE: %" PRIu16 "]\n", header.type_id, header.size);
 	});
 
 	DynArr_ForEach(c_sockets, int, sock, {
@@ -196,7 +207,7 @@ int main(int argc, char *argv[])
 	close(l_socket);
 	DynArr_Free(c_sockets);
 
-	DynArr_Free(dots);
+	DynArr_Free(items);
 
 	return 0;
 }

@@ -39,3 +39,22 @@ char *Float2_ToString(Float2 this) {
     sprintf(str, "(%f, %f)", this.x, this.y);
     return str;
 }
+
+Float4 Float4_New(Float1 x1, Float1 y1, Float1 x2, Float1 y2) {
+    Float4 ret = {
+        .x1 = x1,
+        .y1 = y1,
+        .x2 = x2,
+        .y2 = y2,
+    };
+
+    return ret;
+}
+
+Float4 Float4_FromFloat4(Float4 f4) {
+    return Float4_New(f4.x1, f4.y1, f4.x2, f4.y2);
+}
+
+void Float4_Print(Float4 this) {
+    printf("(%f, %f, %f, %f)", this.x1, this.y1, this.x2, this.y2);    
+}

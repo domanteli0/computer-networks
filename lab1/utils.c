@@ -61,6 +61,20 @@ struct fd_set fd_set_Singleton(int fd) {
     return read_set;
 }
 
+// returns: fd with the highest value
+int fd_set_FromArrWithServerFD(struct fd_set *read_set, int *fdv, size_t fdc, int sfd) {
+   	FD_ZERO(read_set);
+    int maxfd = sfd;
+
+    for (size_t ix = 0; ix < fdc; ++ix) {
+        FD_SET(fdv[ix], read_set);
+        maxfd = fdv[ix] > maxfd ? fdv[ix] : maxfd;
+    }
+    FD_SET(sfd, read_set);
+
+    return maxfd; 
+}
+
 int SelectOne(int fd, int timeout) {
     struct fd_set read_set = fd_set_Singleton(fd);
 

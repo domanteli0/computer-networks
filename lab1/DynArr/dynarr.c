@@ -83,10 +83,17 @@ void *DynArr_FindWithPredicate(DynArr this, bool(pred)(void *)) {
     return NULL;
 }
 
-// TODO:
-// This function is meant to deallocate memory if 
-// half of the array is empty
-void DynArr_resize(DynArr *this) {}
+// Deallocates half the memory if the array
+// is occupied by less than a third
+void DynArr_downsize(DynArr *this) {
+    if ( this->capacity > (this->size * 3) )
+        return;
+
+    this->arr_ptr = realloc(this->arr_ptr, this->capacity / 2);
+    assert(this->arr_ptr != NULL);
+
+    this->capacity /= 2;
+}
 
 void DynArr_FilterOut(DynArr *this, void *elem_cmp) {
     size_t ix = 0;
@@ -108,6 +115,5 @@ void DynArr_FilterOut(DynArr *this, void *elem_cmp) {
         this->size -= 1;
     }
 
-    DynArr_resize(this);
-
+    DynArr_downsize(this);
 }

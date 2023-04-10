@@ -12,3 +12,4 @@ typedef struct ILine {
 } ILine;
 
 ILine ILine_New(Float1 x1, Float1 y1, Float1 x2, Float1 y2);
+ILine ILine_FromFloat4(Float4 f);

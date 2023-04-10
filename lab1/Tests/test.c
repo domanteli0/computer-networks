@@ -67,14 +67,42 @@ void IDotData_test() {
     assert(&(idot.y) == (((uint32_t *) &idot) + 2));
 }
 
-void ILineData_test() {
+void ILine_test() {
+    assert(sizeof(ILine) == sizeof(DrawableHeader) + sizeof(Float4));
     assert(sizeof(ILine) == sizeof(DrawableHeader) + (sizeof(Float2) * 2));
+    assert(sizeof(Float2) * 2 == sizeof(Float4));
+
+    Float4 f4 = Float4_New(
+        10,
+        -1e10,
+        2e-5,
+        5e27
+    );
+
+    ILine line = ILine_FromFloat4(f4);
+
+    DrawableHeader header = {
+        .size = sizeof(Float4),
+        .type_id = ITEM_LINE_TYPE_ID,
+    };
+
+    assert(
+        memcmp( &header, &line, sizeof(DrawableHeader)) == 0
+    );
+
+    assert(
+        memcmp(
+            ((DrawableHeader *) &line) + 1,
+            &f4,
+            sizeof(Float4)
+        ) == 0
+    );
 }
 
 int main() {
     IDotData_test();
     DynArr_test();
-    ILineData_test();
+    ILine_test();
 
     printf("All tests passed 🥳\n");
 }
