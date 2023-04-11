@@ -44,6 +44,12 @@ char *SDL_MouseMotionEventToString(SDL_MouseMotionEvent e) {
     return str;
 }
 
+enum LineMode {
+    Off = 0,
+    Start = 1,
+    End = 4,
+};
+
 typedef struct State {
     SDL_Window *window;
     SDL_Renderer *renderer;
@@ -59,7 +65,7 @@ typedef struct State {
     int socket_fd;
     bool connected;
 
-    bool is_drawing_mode;
+    enum LineMode line_mode;
     Float2 begin;
     Float2 end;
 } State;
@@ -98,7 +104,7 @@ State run_app(
         render(&state);
 
         if (state.socket_fd < 0) {
-            printf("Connection to the server has been severed.\n");
+            SDL_ShowSimpleMessageBox(0, "Coonection error", "Connection to the server has been severed", state.window);
             break;
         }
 
@@ -109,10 +115,54 @@ State run_app(
 }
 
 void OnEvent(State *state, SDL_Event event) {
-    if (event.type == SDL_MOUSEMOTION) {
+
+    if (event.type == SDL_KEYDOWN) {
+        printf("To start\n");
+        state->line_mode = Start;
+    } else if (event.type == SDL_MOUSEBUTTONDOWN && state->line_mode == Start) {
+        printf("To end (%i, %i)\n", event.button.x, event.button.y);
+        state->begin = Float2_New((float) event.motion.x, (float) event.motion.y);
+        state->line_mode = End; 
+    } else if(event.type == SDL_MOUSEBUTTONUP && state->line_mode == End) {
+        state->end = Float2_New((float) event.motion.x, (float) event.motion.y);
+
+        ILine temp_line = ILine_New(
+            state->begin.x,
+            state->begin.y,
+            state->end.x,
+            state->end.y
+        );
+
+        printf("NEW LINE: (%f, %f, %f, %f)\n", 
+            state->begin.x,
+            state->begin.y,
+            state->end.x,
+            state->end.y
+        );
+
+        int send_len = TCP_Send(&(state->socket_fd), &temp_line, sizeof(ILine), 0);
+
+        if (send_len == -1)
+            return;
+
+        DynArr_Push(&(state->lines), &temp_line.start);
+
+        state->line_mode = Off;
+        return;
+    } else if (event.type == SDL_MOUSEMOTION && state->line_mode == Off) {
         bool mouse_left_down = SDL_BUTTON_LMASK == SDL_BUTTON(event.motion.state);
 
         if (mouse_left_down) {
+ 
+            if (state->line_mode == Start) {
+                state->begin = Float2_New((float) event.motion.x, (float) event.motion.y);
+                state->line_mode = End;
+                
+                return;
+            } else if (state->line_mode == End) {
+
+            }
+
             IDotData temp_dot = IDotData_New((float) event.motion.x, (float) event.motion.y);
             int send_len = TCP_Send(&(state->socket_fd), &temp_dot, sizeof(IDotData), 0);
 
@@ -122,6 +172,8 @@ void OnEvent(State *state, SDL_Event event) {
             DynArr_Push(&(state->points), &temp_dot.x);
         }
     }
+
+    fflush(stdout);
 }
 
 void OnRender(State *state) {
@@ -228,7 +280,7 @@ int main(int argc, char *argv[]) {
         .connected = true,
         .socket_fd = server_handle,
 
-        .is_drawing_mode = false,
+        .line_mode = Off,
 
         .item_buf = calloc(MAX_TYPE_SIZE, 1), 
         .header_buf = (DrawableHeader *) state.item_buf,

@@ -213,14 +213,8 @@ int main(int argc, char *argv[])
 	state.items = DynArr_WithCapacity(1024, MAX_TYPE_SIZE);
 
 	// this array is pre-filled only for testing purposes
-	for (size_t ix = 0; ix < 128; ++ix)
-	{
-		IDotData temp = IDotData_New((float)ix, (float)ix);
-		DynArr_Push(&state.items, &temp);
-	}
-
 	for (size_t ix = 10; ix < 100; ix += 10) {
-		ILine temp = ILine_New(ix, ix, ix, ix + 10);
+		ILine temp = ILine_New(ix, ix, ix, ix + 100);
 		DynArr_Push(&state.items, &temp);
 	}
 
