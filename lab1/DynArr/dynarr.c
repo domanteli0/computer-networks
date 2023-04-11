@@ -85,6 +85,7 @@ void *DynArr_FindWithPredicate(DynArr this, bool(pred)(void *)) {
 
 // Deallocates half the memory if the array
 // is occupied by less than a third
+    // FIXME: causes craches
 void DynArr_downsize(DynArr *this) {
     if ( this->capacity > (this->size * 3) )
         return;
@@ -115,5 +116,5 @@ void DynArr_FilterOut(DynArr *this, void *elem_cmp) {
         this->size -= 1;
     }
 
-    DynArr_downsize(this);
+    // DynArr_downsize(this);
 }

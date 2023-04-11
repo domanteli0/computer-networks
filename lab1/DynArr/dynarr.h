@@ -12,6 +12,7 @@ typedef struct DynArr {
     size_t capacity;     // counted in terms of elements, not the individual bytes
     size_t size;         // :ditto
     size_t size_of_elem; // size of individual elements
+    size_t desired_cap;  // TODO: Not to reallocate if capacity is less than this
 } DynArr;
 
 DynArr DynArr_WithCapacity(size_t capacity, size_t size_of_elems);

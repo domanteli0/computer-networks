@@ -117,6 +117,23 @@ void BitArr_test() {
     
     BitArr_Flip(&test, 1);
     assert(!BitArr_Get(test, 1));
+
+    BitArr_Flip(&test, 127);
+    assert(BitArr_Get(test, 127));
+    BitArr_Flip(&test, 127);
+    assert(!BitArr_Get(test, 127));
+
+
+    BitArr_Flip(&test, 128);
+    assert(BitArr_Get(test, 128));
+    BitArr_Flip(&test, 128);
+    assert(!BitArr_Get(test, 128));
+
+    BitArr_Flip(&test, 200);
+    assert(BitArr_Get(test, 200));
+    BitArr_Flip(&test, 200);
+    assert(!BitArr_Get(test, 200));
+
 }
 
 int main() {
