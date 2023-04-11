@@ -3,6 +3,7 @@
 #include "../Types/iline.h"
 #include "../Types/floatx.h"
 #include "../DynArr/dynarr.h"
+#include "../BitArr/bitarr.h"
 #include <string.h>
 #include <stdio.h>
 
@@ -99,13 +100,33 @@ void ILine_test() {
     );
 }
 
+void BitArr_test() {
+    BitArr test = BitArr_New();
+    BitArr_Flip(&test, 1);
+
+    assert(!BitArr_Get(test, -1));
+    assert(BitArr_Get(test, 1));
+
+    BitArr_Flip(&test, -1);
+    BitArr_Flip(&test, -1);
+
+    assert(!BitArr_Get(test, -1));
+
+    BitArr_Flip(&test, -1);
+    assert(BitArr_Get(test, -1));
+    
+    BitArr_Flip(&test, 1);
+    assert(!BitArr_Get(test, 1));
+}
+
 int main() {
     IDotData_test();
     DynArr_test();
     ILine_test();
+    BitArr_test();
 
     assert(sizeof(uint32_t) == sizeof(Float1));
-    
+
     printf("All tests passed 🥳\n");
 }
 
