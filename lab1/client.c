@@ -31,19 +31,6 @@ int TCP_ConnectTo(char *ipv4_addr, char *port);
 int SelectSingleton(int fd, int timepout);
 void do_nothing(void) {}
 
-void Float2_PrintFromPtr(Float2 *f2) {
-    printf("(%f, %f)\n", f2->x, f2->y);
-}
-
-char *SDL_MouseMotionEventToString(SDL_MouseMotionEvent e) {
-    const size_t STR_LEN = 1024;
-    char *str = calloc(STR_LEN, 1);
-
-    sprintf(str, "x: %i, y: %i", e.x, e.y);
-
-    return str;
-}
-
 enum LineMode {
     Off = 0,
     Start = 1,
@@ -92,7 +79,7 @@ State run_app(
                 fprintf(stderr, "select error");
                 break;
             case 0:
-                // just a timeout, just carry on, we don't care
+                // just a timeout, carry on, we don't care
                 break;
             default:
                 printf("About to receive some bytes\n");
@@ -212,7 +199,7 @@ void OnAvailableData(State *state) {
         0
     );
 
-    printf("Got %" PRIu16 " bytes\n", recv_bytes);
+    printf("Got %i bytes\n", recv_bytes);
 
     if (recv_bytes == -1) {
         // TODO: pop window
@@ -263,7 +250,6 @@ int main(int argc, char *argv[]) {
     SDL_Window *window;
     SDL_Renderer *renderer;
     SDL_Surface *surface = NULL;
-    SDL_Event event;
 
     // if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS) != 0) {
     if (SDL_Init(SDL_INIT_EVERYTHING) != 0) {

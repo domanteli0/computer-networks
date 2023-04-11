@@ -212,12 +212,6 @@ int main(int argc, char *argv[])
 	state.item_buf = calloc(MAX_TYPE_SIZE, 1);
 	state.items = DynArr_WithCapacity(1024, MAX_TYPE_SIZE);
 
-	// this array is pre-filled only for testing purposes
-	for (size_t ix = 10; ix < 100; ix += 10) {
-		ILine temp = ILine_New(ix, ix, ix, ix + 100);
-		DynArr_Push(&state.items, &temp);
-	}
-
 	run_server(state, OnAccept, OnAvailableData);
 
 	DynArr_ForEach(state.c_sockets, int, sock, {
