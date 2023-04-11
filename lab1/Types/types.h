@@ -5,4 +5,5 @@
 
 #define MAX_SIZEOF(left, right) sizeof(left) > sizeof(right) ? sizeof(left) : sizeof(right)
 
-#define MAX_TYPE_SIZE MAX_SIZEOF(IDotData, ILine)
+// #define MAX_TYPE_SIZE MAX_SIZEOF(IDotData, ILine)
+#define MAX_TYPE_SIZE sizeof(ILine)

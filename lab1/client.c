@@ -25,7 +25,7 @@
 #include "Dict/dict.h"
 #include "utils.h"
 
-#define MIN(a,b) ((a) > (b)) ? (a) : (b) 
+#define MIN(a,b) ((a) < (b)) ? (a) : (b) 
 
 int TCP_ConnectTo(char *ipv4_addr, char *port);
 int SelectSingleton(int fd, int timepout);
@@ -51,12 +51,13 @@ char *SDL_MouseMotionEventToString(SDL_MouseMotionEvent e) {
 
 typedef struct State {
     bool connected;
+    bool is_drawing_mode;
+    Float2 begin;
+    Float2 end;
 } State;
 
 // TODO: waiting_to_send queue for failed sends
 int main(int argc, char *argv[]) {
-
-    assert(sizeof(uint32_t) == sizeof(Float1));
 
     if (argc != 3){
         fprintf(stderr, "USAGE: <ip> <port>\n");
@@ -102,10 +103,11 @@ int main(int argc, char *argv[]) {
     DrawableHeader *header_buf = (DrawableHeader *) item_buf;
     void *data_buf = header_buf + 1;
 
-    DynArr points = DynArr_WithCapacity(2 * 1024, sizeof(Float2));
+    DynArr points = DynArr_WithCapacity(2048, sizeof(Float2));
     DynArr lines = DynArr_WithCapacity(128, sizeof(ILine));
     State state = {
-        .connected = true
+        .connected = true,
+        .is_drawing_mode = false,
     };
 
     Float4 temp_f4 = Float4_New(200, 200, 200, 300);
@@ -122,15 +124,9 @@ int main(int argc, char *argv[]) {
             break;
         }
 
-        // TODO: Check if server is alive
-
-        // handle receiving data 
+        // this handles incoming data 
         {
-            fd_set read_set = fd_set_Singleton(server_handle);
-            struct timeval timeout = timeval_FromMicro(10000);
-
-            switch (select(server_handle + 1, &read_set, NULL, NULL, &timeout)) {
-            // switch (SelectSingleton(server_handle, 1000)) {
+            switch (SelectSingleton(server_handle, 1000)) {
                 case -1:
                     fprintf(stderr, "select error");
                     break;
@@ -148,13 +144,17 @@ int main(int argc, char *argv[]) {
                         sizeof(DrawableHeader),
                         0);
                         
-                    printf("Header received [ TYPE: 0x%" PRIX16 " | SIZE: %" PRIu16 " ]\n", header_buf->type_id, header_buf->size);
+                    printf("Header received: ");
+                    DrawableHeader_Printf(*header_buf);
+                    printf("\n");
 
-                    // I was planning to more types than dots
-                    // so just imagine type_id is checked and appropiate type is sellected
+                    recv_bytes = TCP_Recv(
+                        &server_handle, 
+                        data_buf, 
+                        MIN(header_buf->size, MAX_TYPE_SIZE),
+                        0
+                    );
 
-                    // TODO: use min of header size and max type size, for recv
-                    recv_bytes = TCP_Recv(&server_handle, data_buf, header_buf->size, 0);
                     printf("Got %" PRIu16 " bytes\n", recv_bytes);
 
                     if (recv_bytes == -1) {
@@ -186,43 +186,22 @@ int main(int argc, char *argv[]) {
                             0x20);
         SDL_RenderClear(renderer);
 
-        // TODO: if poll, retrive new data
-
-        // TODO: Generalize this:
-        // dict: key - (UiMode, event), value - fn(...) -> struct Item
-
         // draw, send and store
         if (event.type == SDL_MOUSEMOTION) {
             bool mouse_left_down = SDL_BUTTON_LMASK == SDL_BUTTON(event.motion.state);
 
-            // event.motion.x
-            // event.motion.xrel
-
             if (mouse_left_down) {
-                printf("Drawing dots\n");
-
-                Float2 temp_f2 = Float2_New((float) event.motion.x, (float) event.motion.y);
-                IDotData temp_dot = IDotData_FromFloat2(temp_f2);
-                printf("BEFORE SEND: (%f, %f)\n", temp_dot.x, temp_dot.y);
-                fflush(stdout);
-
+                IDotData temp_dot = IDotData_New((float) event.motion.x, (float) event.motion.y);
                 uint32_t *t_ptr = (uint32_t *) &temp_dot;
-
-                printf("Values arth:  Size: %" PRIu16 ", Type: 0x%" PRIX16 " (%f %f)\n",
-                    *(((uint16_t *) t_ptr) + 1),
-                    *(uint16_t *) t_ptr,
-                    *((Float1 *) (t_ptr + 1)),
-                    *((Float1 *) (t_ptr + 2))
-                );
-                fflush(stdout);
 
                 int send_len = TCP_Send(&server_handle, &temp_dot, sizeof(IDotData), 0);
 
                 if (send_len == -1) {
+                    printf("connection severed. quiting application\n");
                     break;
                 }
 
-                DynArr_Push(&points, &temp_f2);
+                DynArr_Push(&points, &temp_dot.x);
             }
 
             if (server_handle == -1) {
@@ -236,6 +215,7 @@ int main(int argc, char *argv[]) {
         DynArr_ForEachPtr(lines, el, {
             SDL_RenderDrawLinesF(renderer, el, 2);
         });
+
         SDL_RenderPresent(renderer);
 
         if (server_handle < 0) {

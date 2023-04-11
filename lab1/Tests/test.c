@@ -104,6 +104,8 @@ int main() {
     DynArr_test();
     ILine_test();
 
+    assert(sizeof(uint32_t) == sizeof(Float1));
+    
     printf("All tests passed 🥳\n");
 }
 

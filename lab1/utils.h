@@ -24,6 +24,7 @@ RngGen RngGen_new();
 void RngGen_free(RngGen rng_gen);
 struct timeval timeval_FromMicro(int micro_seconds);
 struct fd_set fd_set_Singleton(int fd);
+int SelectSingleton(int fd, int timeout);
 int fd_set_FromArrWithServerFD(struct fd_set *read_set, int *fdv, size_t fdc, int sfd);
 int TCP_Send(int *fd, void *data, size_t size, int flags);
 int TCP_Recv(int *fd, void *data, size_t size, int flags);

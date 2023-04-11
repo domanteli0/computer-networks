@@ -75,7 +75,7 @@ int fd_set_FromArrWithServerFD(struct fd_set *read_set, int *fdv, size_t fdc, in
     return maxfd; 
 }
 
-int SelectOne(int fd, int timeout) {
+int SelectSingleton(int fd, int timeout) {
     struct fd_set read_set = fd_set_Singleton(fd);
 
     struct timeval timeout_s = timeval_FromMicro(timeout);
