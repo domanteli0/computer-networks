@@ -24,6 +24,9 @@ dependencies:
 - network
 - transformers
 - extra
+- time
+- stringsearch
+- utf8-string
 
 ghc-options:
 - -Wall

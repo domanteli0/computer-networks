@@ -3,12 +3,15 @@ module Main (main) where
 
 import Lib
 import Utils
+import Header
 
 import Network.Socket
 import Network.Socket.ByteString
 
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as BC8
+import qualified Data.ByteString.Search as BSS
+import qualified Data.ByteString.UTF8 as BS8
 
 import System.Environment
 
@@ -28,8 +31,8 @@ crlf = "\r\n"
 headerEnd :: BS.ByteString
 headerEnd = "\r\n\r\n"
 
-bsa = BS.append
-bp = BC8.pack
+lToBS :: [String] -> BS.ByteString
+lToBS = foldr (BS.append . BC8.pack) ""
 
 usageInfo :: String
 usageInfo = "USAGE: stack run -- <URL>"
@@ -42,20 +45,23 @@ main = do
     Right url -> do
       let (host, path) = splitURL url
       hostInfo <- head <$> resolve host
-      let addr = addrAddress hostInfo 
+      let addr = addrAddress hostInfo
 
       sock <- socket AF_INET Stream 0 -- IPv4
       -- sock <- socket AF_INET6 Stream 0 
       connect sock addr
 
-      -- let req =  "GET " `bsa` bp path `bsa` " HTPP/1.1" `bsa` crlf `bsa` "Host: " `bsa` bp host `bsa` crlf `bsa` crlf
-      let req = "GET " `bsa` bp path `bsa` " HTTP/1.1\r\nHost: " `bsa` bp host `bsa`"\r\n\r\n"
+      let req = lToBS ["GET ", path, " HTTP/1.1\r\nHost: ", host, "\r\n\r\n" ]
       print req
-      sendAll sock req 
+      sendAll sock req
 
       (header, after_header) <- recvUntil sock headerEnd
       print header
       print after_header
+
+      print $ map (parseHeader . BS8.toString) $ tail $ BSS.split crlf header
+
+
 
       close sock
 
@@ -89,7 +95,7 @@ getAppArgs = do
     where
       validArgs :: [String] -> Either Error String
       validArgs [url] = do
-        return url 
+        return url
       validArgs _ = Left usageInfo
 
 
