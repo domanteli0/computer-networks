@@ -12,13 +12,21 @@ import qualified Data.ByteString.Char8 as BC8
 
 import System.Environment
 
+import Data.List.Extra
+
 import Control.Monad.Except
 import Control.Error.Util
+
+import Control.Concurrent
+
+import Data.Bifunctor
 
 type Error = String
 
 crlf :: BS.ByteString
 crlf = "\r\n"
+headerEnd :: BS.ByteString
+headerEnd = "\r\n\r\n"
 
 bsa = BS.append
 bp = BC8.pack
@@ -26,31 +34,50 @@ bp = BC8.pack
 usageInfo :: String
 usageInfo = "USAGE: stack run -- <URL>"
 
+main :: IO ()
 main = do
   validArgs <- runExceptT getAppArgs
   case validArgs of
     Left errMsg -> putStrLn errMsg
     Right url -> do
       let (host, path) = splitURL url
-
-      sock <- socket AF_INET Stream 0
       hostInfo <- head <$> resolve host
-      connect sock $ addrAddress hostInfo
+      let addr = addrAddress hostInfo 
+
+      sock <- socket AF_INET Stream 0 -- IPv4
+      -- sock <- socket AF_INET6 Stream 0 
+      connect sock addr
 
       -- let req =  "GET " `bsa` bp path `bsa` " HTPP/1.1" `bsa` crlf `bsa` "Host: " `bsa` bp host `bsa` crlf `bsa` crlf
       let req = "GET " `bsa` bp path `bsa` " HTTP/1.1\r\nHost: " `bsa` bp host `bsa`"\r\n\r\n"
       print req
       sendAll sock req 
-      msg <- recv sock 1024
 
-      
+      (header, after_header) <- recvUntil sock headerEnd
+      print header
+      print after_header
 
       close sock
-      print msg
+
+recvUntil :: Socket -> BS.ByteString -> IO (BS.ByteString, BS.ByteString)
+recvUntil = recvUntil' ""
+      where
+        recvLen = 3
+
+        recvUntil' :: BS.ByteString -> Socket -> BS.ByteString -> IO (BS.ByteString, BS.ByteString)
+        recvUntil' acc sock' untilBS' = do
+          msg <- recv sock' recvLen
+
+          let (bef, aft) = BS.breakSubstring untilBS' $ acc `BC8.append` msg
+          if BS.null aft then
+            recvUntil' bef sock' untilBS'
+          else
+            return (bef, BS.drop (BS.length untilBS') aft)
 
 resolve :: String -> IO [AddrInfo]
 resolve host = do
-  let hints = defaultHints { addrFlags = [AI_ADDRCONFIG], addrSocketType = Stream }
+  -- let hints = defaultHints { addrFlags = [AI_ALL], addrSocketType = Stream }
+  let hints = defaultHints { addrFlags = [AI_ADDRCONFIG], addrSocketType = Stream } -- IPv4
 
   getAddrInfo (Just hints) (Just host) (Just "http")
 

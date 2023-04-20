@@ -1,6 +1,6 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.35.1.
+-- This file has been generated from package.yaml by hpack version 0.35.2.
 --
 -- see: https://github.com/sol/hpack
 
@@ -35,6 +35,9 @@ library
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints
   build-depends:
       base >=4.7 && <5
+    , extra
+    , network
+    , transformers
   default-language: Haskell2010
 
 executable lab2-exe
@@ -48,9 +51,11 @@ executable lab2-exe
       base >=4.7 && <5
     , bytestring
     , errors
+    , extra
     , lab2
     , mtl
     , network
+    , transformers
   default-language: Haskell2010
 
 test-suite lab2-test
@@ -63,7 +68,10 @@ test-suite lab2-test
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       base >=4.7 && <5
+    , extra
     , lab2
+    , network
     , tasty
     , tasty-hunit
+    , transformers
   default-language: Haskell2010
