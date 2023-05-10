@@ -26,8 +26,8 @@ source-repository head
 library
   exposed-modules:
       Header
-      Lib
-      Types
+      MySocket
+      Nuke
       Utils
   other-modules:
       Paths_lab2
@@ -36,6 +36,8 @@ library
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints
   build-depends:
       base >=4.7 && <5
+    , bytestring
+    , containers
     , extra
     , network
     , stringsearch
@@ -54,6 +56,7 @@ executable lab2-exe
   build-depends:
       base >=4.7 && <5
     , bytestring
+    , containers
     , errors
     , extra
     , lab2
@@ -75,6 +78,8 @@ test-suite lab2-test
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       base >=4.7 && <5
+    , bytestring
+    , containers
     , extra
     , lab2
     , network

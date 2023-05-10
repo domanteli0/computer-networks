@@ -26,7 +26,9 @@ dependencies:
 - extra
 - time
 - stringsearch
+- bytestring
 - utf8-string
+- containers
 
 ghc-options:
 - -Wall
