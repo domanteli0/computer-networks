@@ -4,10 +4,22 @@
 module Header(
     Header(..)
   , HeaderWarn(..)
+  , ResponseHead
+  , version
+  , statusCode
+  , headers
+  , Version
+  , StatusCode
+  , Headers
+  , RequestHead(..)
   , parseHeaders
   , runReadP
   , getHContentLength
+  , getHLocation
+  , parseResponseHead
   ) where
+
+import StatusCode as SC
 
 import qualified Data.Time as T
 import qualified Text.ParserCombinators.ReadP as P
@@ -22,13 +34,32 @@ import qualified Data.ByteString.Search as BSS
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.UTF8 as BS8
 import Data.Bifunctor (Bifunctor(bimap))
-import Data.List (find)
+import qualified Data.List as L
+import qualified Debug.Trace as DT
+
+data Method = GET | POST | HEAD | PUT | DELETE | CONNECT | OPTIONS | TRACE | PATCH | Other String
+
+data Version = HTTP10 | HTTP11 -- | HTTP2 | HTTP3 not relevent
+instance Show Version where
+  show HTTP10 = "HTTP/1.0"
+  show HTTP11 = "HTTP/1.1"
+
+type URL = String
+type Headers = [Header]
+
+data RequestHead = RequestHead Method URL Version [Header]
+data ResponseHead = ResponseHead { 
+    version :: Version
+  , statusCode :: StatusCode
+  , headers :: Headers
+}
 
 data Header =
     HContentType String
   | HContentLength Int
   | HDate T.UTCTime
   | HServer String
+  | HLocation String
   -- TODO: fix www-authenticate
   -- it is more complex than a string
   | HWWWAuthenticate [String]     -- TODO: parser for this header
@@ -39,20 +70,24 @@ data Header =
   | HOther (String, String)
   deriving (Show)
 
--- instance Show Header where
---   show (HContentLength len) = "Content-Length: " ++ show len
---   show _ = undefined
-
 getHContentLength :: [Header] -> Maybe Int
-getHContentLength hdrs = 
-    fromJust
-  . toMaybeHContentLenght
-  <$> find (isJust . toMaybeHContentLenght) hdrs
+getHContentLength = getHeaderBuilder toMaybeHContentLenght
+
+getHLocation :: [Header] -> Maybe String
+getHLocation = getHeaderBuilder toMaybeHLocation
+
+getHeaderBuilder :: (Header -> Maybe a) -> [Header] -> Maybe a
+getHeaderBuilder f hdrs = fromJust . f <$> L.find (isJust . f) hdrs
 
 toMaybeHContentLenght :: Header -> Maybe Int
 toMaybeHContentLenght (HContentLength len) = Just len
 toMaybeHContentLenght _ = Nothing
 
+toMaybeHLocation :: Header -> Maybe String
+toMaybeHLocation (HLocation loc) = Just loc
+toMaybeHLocation _ = Nothing
+
+-- TODO
 getHeader :: [Header] -> String -> Maybe String
 getHeader hdrs hdr = Just "5"
   where
@@ -61,13 +96,11 @@ getHeader hdrs hdr = Just "5"
     getHeader' :: [Header] -> String -> Maybe a
     getHeader' hdrs hrd = undefined
 
--- getHeaderValue :: Header -> a
--- getHeaderValue
-
 data HeaderWarn =
     HWarnDuplicateHeaders [(String, [Int])]
   | HWarnMissingValue [(Int, String)]
   deriving (Show)
+
 
 -- TODO: Errors and warnings
 parseHeaders :: BS.ByteString -> ([HeaderWarn], [Header])
@@ -82,12 +115,37 @@ validateHeaders _ = []
 -- validateHeaders :: [Header] -> ([HeaderWarn], [Header])
 -- validateHeaders = undefined
 
+parseResponseHead :: BS.ByteString -> Maybe ResponseHead
+parseResponseHead str = do
+  let (firstLine, headersStr) = BS.breakSubstring "\r\n" str
+
+  (ver, statCode) <- runReadP parseFirstLine ( BS8.toString firstLine )
+  let headers = ( mapMaybe (parseHeader . BS8.toString) . BSS.split "\r\n" ) headersStr
+
+  return $ ResponseHead ver statCode headers
+  where
+
+    parseFirstLine :: P.ReadP (Version, StatusCode)
+    parseFirstLine = do
+      _ <- P.string "HTTP/"
+      ver <- ( HTTP11 <$ P.string "1.1" ) P.<++ ( HTTP10 <$ P.string "1.0" )
+      _ <- P.skipSpaces
+      code <- intP
+      _ <- P.skipSpaces
+      str' <- P.munch (/= '\r')
+      return (ver, SC.fromIntStr code str')
+
+    ( ||| ) :: (a -> Bool) -> (a -> Bool) -> a -> Bool
+    p ||| q = \a -> p a || p a
+
+
 parseHeader :: String -> Maybe Header
 parseHeader = runReadP $
         hDateP
   P.<++ hContentLengthP
   P.<++ (HContentType <$> hKVPValueP "Content-Type:")
-  P.<++ (HServer <$> hKVPValueP "Server:")
+  P.<++ (HServer      <$> hKVPValueP "Server:")
+  P.<++ (HLocation    <$> hKVPValueP "Location:")
   P.<++ hOtherP
 
   where

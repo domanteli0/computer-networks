@@ -29,6 +29,8 @@ dependencies:
 - bytestring
 - utf8-string
 - containers
+- errors
+- mtl
 
 ghc-options:
 - -Wall

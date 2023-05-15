@@ -26,8 +26,8 @@ source-repository head
 library
   exposed-modules:
       Header
-      MySocket
       Nuke
+      StatusCode
       Utils
   other-modules:
       Paths_lab2
@@ -38,7 +38,9 @@ library
       base >=4.7 && <5
     , bytestring
     , containers
+    , errors
     , extra
+    , mtl
     , network
     , stringsearch
     , time
@@ -80,8 +82,10 @@ test-suite lab2-test
       base >=4.7 && <5
     , bytestring
     , containers
+    , errors
     , extra
     , lab2
+    , mtl
     , network
     , stringsearch
     , tasty

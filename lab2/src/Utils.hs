@@ -1,13 +1,23 @@
-module Utils(splitURL) where
+{-# LANGUAGE OverloadedStrings #-}
 
-import Data.Bifunctor
+module Utils(
+    splitURL
+  , listStrToBS
+  ) where
+
+import qualified Data.Bifunctor as Bi
+import qualified Data.ByteString as BS
+import qualified Data.ByteString.Char8 as BC8
 
 -- removeProt :: Sting -> String
 -- removeProt = 
 
 splitURL :: String -> (String, String)
-splitURL = second ensureSlash . span (/= '/')
+splitURL = Bi.second ensureSlash . span (/= '/')
 
 ensureSlash :: String -> String
 ensureSlash ('/':str) = '/':str
 ensureSlash str = '/':str
+
+listStrToBS :: [String] -> BS.ByteString
+listStrToBS = foldr (BS.append . BC8.pack) ""
