@@ -83,6 +83,10 @@ doMain = do
   responseHead <- N.maybeNukeT 
       ( H.parseResponseHead response ) 
     $ AppError "The host responeded with malformed headers"
+
+  (buf, _) <- get
+  liftIO $ putStrLn "buf: "
+  liftIO $ print buf
   
   let hLen = H.getHContentLength $ H.headers responseHead
   if M.isJust hLen
@@ -112,7 +116,7 @@ recvUntil sub = do
 
   if not $ BS.null buf'
     then do
-      put (buf', sock)
+      put (BS.drop (BS.length sub) buf', sock)
       return ret
     else do
       msg <- N.tryNuke ( recv sock recvLen )
