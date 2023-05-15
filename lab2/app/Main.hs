@@ -74,7 +74,9 @@ doMain = do
   liftIO $ print req
 
   _ <- N.tryNuke $ sendAll sock req
-  response <- recvUntil crlf2
+  response <- N.replaceErr
+    ( recvUntil crlf2 )
+    ( AppError "Couldn't retrieve a response" ) 
 
   liftIO $ putStrLn "RESPONSE: "
   liftIO $ print response
@@ -102,26 +104,24 @@ handleBodyWithContentLen
 handleBodyWithContentLen msg = do undefined
 --   if get
 
-recvUntil :: BS.ByteString -> N.NukeT AppState e BS.ByteString 
-recvUntil until' = do
+recvUntil :: BS.ByteString -> N.NukeT AppState SomeException BS.ByteString
+recvUntil sub = do
   (buf, sock) <- get
-  (ret, buf') <- liftIO $ recvUntil' buf sock until'
-  put (buf', sock)
 
-  return ret
+  let (ret, buf') = BS.breakSubstring sub buf
+
+  if not $ BS.null buf'
+    then do
+      put (buf', sock)
+      return ret
+    else do
+      msg <- N.tryNuke ( recv sock recvLen )
+      put (buf `BS.append` msg , sock)
+      recvUntil sub
 
   where
-    -- recvLen = 1024
-    recvLen = 32
-
-    recvUntil' :: BS.ByteString -> Socket -> BS.ByteString -> IO (BS.ByteString, BS.ByteString)
-    recvUntil' acc sock' untilBS' = do
-      msg <- recv sock' recvLen
-
-      let (bef, aft) = BS.breakSubstring untilBS' $ acc `BC8.append` msg
-      if BS.null aft
-        then recvUntil' bef sock' untilBS'
-        else return (bef, BS.drop (BS.length untilBS') aft)
+    recvLen :: Int
+    recvLen = 128
 
 recvTake :: Int -> N.NukeT AppState SomeException BS.ByteString
 recvTake len = do
