@@ -18,6 +18,8 @@ import qualified Utils
 import qualified Data.Maybe as M
 import qualified Nuke as N
 
+import qualified System.Console.GetOpt as GO
+
 data AppError = 
     AppError String
   | AppSomeException SomeException
@@ -26,18 +28,34 @@ data AppError =
 instance Exception AppError where
   -- toException = undefined
 
-type AppState = (BS.ByteString, Socket) 
+type AppState = (BS.ByteString, Socket)
+
+data AppFlag = 
+    Host String
+  | Port (Maybe String)
+  | FollowRedirects
+  | OutputToFile ( Maybe String )
+  deriving (Show)
+
+args :: [GO.OptDescr AppFlag]
+args = [
+    GO.Option ['h'] ["host"] (GO.ReqArg Host "HOST" ) "host to connect to" 
+  , GO.Option ['p'] ["port"] (GO.OptArg Port "PORT" ) "port to connect to"
+  , GO.Option ['L'] []       (GO.NoArg FollowRedirects ) "Tells to follow redirects"
+  , GO.Option ['o'] ["output"] (GO.OptArg OutputToFile "FILE") "Saves response body to FILE, otherwise it is printed to stdout"
+  ]
 
 crlf :: BS.ByteString
 crlf = "\r\n"
 crlf2 = "\r\n\r\n"
 
 usageInfo :: String
-usageInfo = "USAGE: stack run -- <URL> [PORT]"
+usageInfo = "USAGE: stack run -- -h <URL> [-p PORT] [-L] [-o FILE]"
 
 -- TODO:
 -- - Chuncked https://stackoverflow.com/questions/19907628/transfer-encoding-chunked
 -- - redirect (if flag is passed)
+-- - save to file
 -- - multiple same key headers: https://stackoverflow.com/questions/3241326/set-more-than-one-http-header-with-the-same-name
 
 main :: IO ()
@@ -84,10 +102,6 @@ doMain = do
       ( H.parseResponseHead response ) 
     $ AppError "The host responeded with malformed headers"
 
-  (buf, _) <- get
-  liftIO $ putStrLn "buf: "
-  liftIO $ print buf
-  
   let hLen = H.getHContentLength $ H.headers responseHead
   if M.isJust hLen
     then do
