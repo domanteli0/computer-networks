@@ -5,6 +5,10 @@ module Header(
     Header(..)
   , HeaderWarn(..)
   , ResponseHead
+  , Response(..)
+  , URL
+  , Host
+  , Path
   , version
   , statusCode
   , headers
@@ -17,6 +21,7 @@ module Header(
   , getHContentLength
   , getHLocation
   , parseResponseHead
+  , buildGetRequest
   ) where
 
 import StatusCode as SC
@@ -35,9 +40,13 @@ import qualified Data.ByteString as BS
 import qualified Data.ByteString.UTF8 as BS8
 import Data.Bifunctor (Bifunctor(bimap))
 import qualified Data.List as L
+import qualified Data.Time as T
 import qualified Debug.Trace as DT
+import qualified Utils
 
 data Method = GET | POST | HEAD | PUT | DELETE | CONNECT | OPTIONS | TRACE | PATCH | Other String
+  deriving (Show)
+-- TODO: fix this for other methods this will not work
 
 data Version = HTTP10 | HTTP11 -- | HTTP2 | HTTP3 not relevent
 instance Show Version where
@@ -45,18 +54,37 @@ instance Show Version where
   show HTTP11 = "HTTP/1.1"
 
 type URL = String
+type Host = String
+type Path = String
 type Headers = [Header]
 
-data RequestHead = RequestHead Method URL Version [Header]
-data ResponseHead = ResponseHead { 
+data RequestHead = RequestHead Method Path Version [Header]
+
+instance Show RequestHead where
+  show (RequestHead method path version headers) =
+    show method ++ " " ++ path ++ " " ++ show version ++ "\r\n"
+    ++ L.intercalate "\r\n" (map show headers) ++ "\r\n\r\n"
+
+data ResponseHead = ResponseHead {
     version :: Version
   , statusCode :: StatusCode
   , headers :: Headers
-}
+} deriving (Show)
+
+data Response = Response {
+    responseHead :: ResponseHead
+  , body :: BS.ByteString
+} deriving (Show)
+
+buildGetRequest :: URL -> ( RequestHead, Host )
+buildGetRequest url = ( RequestHead GET path HTTP11 [HHost host], host )
+  where
+    (host, path) = Utils.splitURL url
 
 data Header =
     HContentType String
   | HContentLength Int
+  | HHost String
   | HDate T.UTCTime
   | HServer String
   | HLocation String
@@ -65,10 +93,21 @@ data Header =
   | HWWWAuthenticate [String]     -- TODO: parser for this header
   -- TOOD: fix set-cookie, ditto
   | HSetCookie [(String, String)] -- TODO: parser for this header
-  | HValueless [String]           -- Represents fields with missing values
+  | HValueless String           -- Represents fields with missing values
                                   -- it is not a part of a http spec
   | HOther (String, String)
-  deriving (Show)
+
+instance Show Header where
+  show (HContentType t) = "Content-Type: " ++ t
+  show (HContentLength l) = "Content-Length " ++ show l
+  show (HDate d) = "Date: " ++ T.formatTime T.defaultTimeLocale "%a, %0d %b %0Y %X" d ++ " GMT"
+  show (HHost h) = "Host: " ++ h
+  show (HServer s) = "Server: " ++ s
+  show (HLocation l) = "Location: " ++ l
+  show (HWWWAuthenticate xs) = "Authenticate: " ++ L.intercalate ", " xs
+  show (HSetCookie xs) = "Set-Cookie: " ++ L.intercalate ", " (map (\(k, v) -> show k ++ "=" ++ show v) xs)
+  show (HValueless val) = val
+  show (HOther (k, v)) = k ++ ": " ++ v
 
 getHContentLength :: [Header] -> Maybe Int
 getHContentLength = getHeaderBuilder toMaybeHContentLenght

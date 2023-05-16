@@ -12,18 +12,19 @@ import qualified Data.ByteString.Char8 as BC8
 import qualified Header as H
 import Network.Socket
 import Network.Socket.ByteString
-import qualified System.Environment as Env
 import qualified Utils
 
 import qualified Data.Maybe as M
-import qualified Nuke as N
+import qualified StatusCode as SC
 
 import qualified System.IO as IO
 import qualified Args
+import qualified Nuke as N
 
 data AppError =
     AppError String
   | AppUsageError String
+  | AppCantHandleBody [NoHandleReason]
   | AppSomeException Exp.SomeException
   deriving (Show)
 
@@ -45,6 +46,8 @@ crlf2 = "\r\n\r\n"
 -- TODO:
 -- - Chuncked https://stackoverflow.com/questions/19907628/transfer-encoding-chunked
 -- - redirect (if flag is passed)
+--  google.com/favicon.ico
+-- -> www.google.com/favicon.ico
 -- - save to file
 -- - multiple same key headers: https://stackoverflow.com/questions/3241326/set-more-than-one-http-header-with-the-same-name
 
@@ -76,7 +79,7 @@ getArgs = do
   (_, _, args) <- get
   return args
 
-doMain :: N.NukeT AppState AppError Socket
+doMain :: N.NukeT AppState AppError ()
 doMain = do
   rawArgs <- N.mapErr
     ( lift Args.getAppArgs )
@@ -86,18 +89,29 @@ doMain = do
     Just filepath -> liftIO $ IO.openBinaryFile filepath IO.WriteMode
     Nothing -> liftIO $ do return IO.stdout )
 
-  argMap (\args -> 
-    args { 
+  argMap (\args ->
+    args {
         output = handle
       , followRedirects = Args.followRedirectsRaw rawArgs
     })
-  
-  let url = Args.host rawArgs
-  let maybePort = Args.port rawArgs
+  args <- getArgs
 
+  let url = Args.host rawArgs
+
+  response <- sendGet url
+
+  if followRedirects args then do
+    response' <- handleRedirect response
+    liftIO $ print response'
+  else do
+    liftIO $ print response
+
+
+sendGet :: H.URL -> N.NukeT AppState AppError H.Response
+sendGet url = do
   let (host, path) = Utils.splitURL url
   hostInfo <- N.replaceErr
-    ( head <$> N.tryNuke @Exp.SomeException ( resolve host maybePort ) )
+    ( head <$> N.tryNuke @Exp.SomeException ( resolve host Nothing ) )
     ( AppError ( "Could not resolve the hostname [" ++ host ++ "]" ) )
   let sockAddr = addrAddress hostInfo
   --     -- let sockAddr = SockAddrInte6 -- TODO: IPv6
@@ -110,11 +124,10 @@ doMain = do
     (AppError "Failed to connect to host")
   (_, sock, _) <- get
 
+  let ( head, host ) = H.buildGetRequest url
+  liftIO $ print head
 
-  let req = Utils.listStrToBS ["GET ", path, " HTTP/1.1\r\nHost: ", host, "\r\n\r\n"]
-  liftIO $ print req
-
-  _ <- N.tryNuke $ sendAll sock req
+  _ <- N.tryNuke $ sendAll sock $ BC8.pack $ show head
   response <- N.replaceErr
     ( recvUntil crlf2 )
     ( AppError "Couldn't retrieve a response" )
@@ -124,27 +137,73 @@ doMain = do
   responseHead <- N.maybeNukeT
       ( H.parseResponseHead response )
     $ AppError "The host responeded with malformed headers"
+  -- responseHead <- handleRedirect responseHead
 
-  let hLen = H.getHContentLength $ H.headers responseHead
+  body <- handleBody responseHead
+
+  liftIO $ close sock
+
+  return $ H.Response {
+      H.responseHead = responseHead
+    , H.body = body
+  }
+
+  -- resolve host
+  -- create sock
+  -- send data
+
+
+handleRedirect :: H.Response -> N.NukeT AppState AppError H.Response
+handleRedirect response =
+  if SC.isSc3xx ( ( H.statusCode . H.responseHead ) response )
+    && ( M.isJust . H.getHLocation . H.headers . H.responseHead) response then do
+    let url = ( M.fromJust . H.getHLocation . H.headers . H.responseHead) response
+
+    response <- sendGet url
+    handleRedirect response
+
+  else do return response
+
+handleBody
+  :: H.ResponseHead
+  -> N.NukeT AppState AppError BS.ByteString
+handleBody = foo handlers []
+  where
+    handlers = [
+          handleBodyWithContentLen
+      ]
+    foo
+      :: [H.ResponseHead -> N.NukeT AppState AppError (Either NoHandleReason BS.ByteString)]
+      -> [NoHandleReason]
+      -> H.ResponseHead
+      -> N.NukeT AppState AppError BS.ByteString
+    foo [] reasons _ = N.throwNuke $ AppCantHandleBody reasons
+    foo ( hand:hands ) reasons head = do
+      resp <- hand head
+      case resp of
+        Right body -> return body
+        Left err -> foo hands (err:reasons) head
+      -- N.throwNuke $ AppError "No Content-Length in response headers"
+
+data NoHandleReason =
+    NoContentLen
+  | NoChunked
+  deriving (Show)
+
+handleBodyWithContentLen
+  :: H.ResponseHead
+  -> N.NukeT AppState AppError (Either NoHandleReason BS.ByteString)
+handleBodyWithContentLen head = do
+  let hLen = H.getHContentLength $ H.headers head
   if M.isJust hLen
     then do
       body <- N.mapErr
         ( recvTake (M.fromJust hLen) )
         AppSomeException
-      liftIO $ print "BODY:"
-      -- liftIO $ 
-      liftIO $ print body
-      return sock
-    else do
-      N.throwNuke $ AppError "No Content-Length in response headers"
+      return $ Right body
+    else do return $ Left NoContentLen
 
--- handleBody = [ handleBodyWithContentLen ]
-
-handleBodyWithContentLen
-  :: H.ResponseHead
-  -> N.NukeT AppState AppError (Maybe BS.ByteString)
-handleBodyWithContentLen msg = do undefined
---   if get
+handleBodyChunked = undefined
 
 recvUntil :: BS.ByteString -> N.NukeT AppState Exp.SomeException BS.ByteString
 recvUntil sub = do

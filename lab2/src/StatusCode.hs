@@ -68,6 +68,7 @@ module StatusCode(
   , isSc509
   , isSc510
   , isSc511
+  , isSc3xx
   , isScOther
   , isSc
   , toInt
@@ -132,7 +133,7 @@ data StatusCode =
   | Sc429 String
   | Sc431 String
   | Sc451 String
- 
+
   | Sc500 String
   | Sc501 String
   | Sc502 String
@@ -145,7 +146,7 @@ data StatusCode =
   | Sc509 String
   | Sc510 String
   | Sc511 String
- 
+
   | ScOther Int String
 
 instance Show StatusCode where
@@ -565,6 +566,11 @@ isScOther :: StatusCode -> Bool
 isScOther (ScOther _ _) = True
 isScOther _ = False
 
+mkIsScxxx range stat = any ( uncurry isSc ) $ zip (repeat stat) range
+
+isSc3xx :: StatusCode -> Bool
+isSc3xx = mkIsScxxx [300..308]
+
 isSc :: StatusCode -> Int -> Bool
 isSc (Sc100 _) 100 = True
 isSc (Sc101 _) 101 = True
@@ -633,6 +639,7 @@ isSc (Sc509 _) 509 = True
 isSc (Sc510 _) 510 = True
 isSc (Sc511 _) 511 = True
 isSc (ScOther num _) num' = num == num'
+isSc _ _ = False
 
 toInt :: StatusCode -> Int
 toInt (Sc100 _) = 100

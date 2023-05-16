@@ -41,6 +41,7 @@ library
     , containers
     , errors
     , extra
+    , monad-loops
     , mtl
     , network
     , stringsearch
@@ -63,6 +64,7 @@ executable lab2-exe
     , errors
     , extra
     , lab2
+    , monad-loops
     , mtl
     , network
     , stringsearch
@@ -86,6 +88,7 @@ test-suite lab2-test
     , errors
     , extra
     , lab2
+    , monad-loops
     , mtl
     , network
     , stringsearch
